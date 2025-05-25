@@ -3,7 +3,10 @@
 
 Creates a stylized 9:16 poster for a Letterboxd film review — perfect for sharing on social media.
 
-![screenshot](public/assets/demo.png)
+<p align="center">
+  <img src="public/assets/demo.jpg" alt="Screenshot" width="400"/>
+</p>
+
 
 ## ✨ Features
 
