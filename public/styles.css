@@ -1,0 +1,214 @@
+/* === SVG Font Styling (Poster Output) === */
+
+.stars {
+  fill: gold;
+  font-size: 60px;
+  font-family: 'SF Pro Rounded', 'Segoe UI', sans-serif;
+  letter-spacing: 8px;
+}
+
+.stars::after {
+  content: "☆☆☆☆☆";
+}
+
+.rating-container {
+  fill: gold;
+  font-size: 60px;
+  font-family: 'SF Pro Rounded', 'Segoe UI', sans-serif;
+  letter-spacing: 8px;
+}
+
+.tags {
+  fill: #ccc;
+  font-size: 28px;
+  font-style: italic;
+  font-family: 'SF Pro Text', 'Segoe UI', sans-serif;
+}
+
+.genre {
+  fill: #ccc;
+  font-size: 28px;
+  font-family: 'SF Pro Text', 'Segoe UI', sans-serif;
+}
+
+.actors {
+  fill: #ddd;
+  font-size: 30px;
+  font-family: 'SF Pro Text', 'Segoe UI', sans-serif;
+  font-style: italic;
+}
+
+.title {
+  fill: #fff;
+  font-size: 64px;
+  font-weight: 700;
+  font-family: 'SF Pro Display', 'Segoe UI', sans-serif;
+  line-height: 1.2;
+}
+
+.year,
+.user {
+  fill: #aaa;
+  font-size: 34px;
+  font-family: 'SF Pro Text', 'Segoe UI', sans-serif;
+}
+
+.label {
+  fill: #aaa;
+  font-size: 32px;
+  font-family: 'SF Pro Text', 'Segoe UI', sans-serif;
+}
+
+.bold {
+  fill: #fff;
+  font-weight: bold;
+  font-size: 32px;
+  font-family: 'SF Pro Text', 'Segoe UI', sans-serif;
+}
+
+.logo {
+  opacity: 0.3;
+}
+
+
+/* === UI Layout & Controls (Frontend) === */
+
+body {
+  background: #121212;
+  color: #eee;
+  font-family: 'Segoe UI', sans-serif;
+  margin: 0;
+  padding: 0;
+}
+
+.container {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+h1, h2 {
+  color: #0cf;
+}
+
+.card {
+  background: #1e1e1e;
+  border-radius: 12px;
+  padding: 20px;
+  margin: 20px 0;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+
+input[type="url"],
+input[type="range"] {
+  width: 100%;
+  padding: 10px;
+  margin: 8px 0 16px;
+  border-radius: 6px;
+  border: none;
+  background: #2c2c2c;
+  color: #eee;
+  font-size: 16px;
+}
+
+input[type="checkbox"] {
+  margin-right: 8px;
+}
+
+button {
+  background: #00b0ff;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 12px 24px;
+  font-size: 16px;
+  cursor: pointer;
+  transition: 0.3s ease;
+  width: 100%;
+  margin-top: 12px;
+}
+
+button:hover {
+  background: #0095e0;
+}
+
+#reorder-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  border: 1px solid #333;
+  border-radius: 8px;
+  background: #2a2a2a;
+}
+
+#reorder-list li {
+  padding: 10px 16px;
+  border-bottom: 1px solid #444;
+  cursor: grab;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+#reorder-list li:last-child {
+  border-bottom: none;
+}
+
+details summary {
+  cursor: pointer;
+  font-weight: bold;
+  margin-bottom: 10px;
+  color: #0cf;
+}
+
+.progress,
+.result {
+  text-align: center;
+  margin-top: 20px;
+}
+
+img#generated-image {
+  width: 100%;
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+}
+
+.buttons {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.buttons button {
+  flex: 1;
+}
+
+@media (max-width: 768px) {
+  .settings {
+    margin-top: 20px;
+  }
+  #reorder-list li {
+    padding: 16px;
+  }
+  .container {
+    padding: 1rem;
+  }
+  .card {
+    margin: 0;
+    padding: 1rem;
+  }
+}
+
+@media (min-width: 769px) {
+  #settings-panel {
+    display: block;
+  }
+  details[open] summary::after {
+    content: "▲";
+  }
+  summary::after {
+    content: "▼";
+    float: right;
+  }
+}
