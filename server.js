@@ -115,10 +115,12 @@ app.post('/generate-image', async (req, res) => {
     if (gradientOverlay) {
       svgParts.push(`
         <defs>
-          <linearGradient id="bottomFade" x1="0" y1="1" x2="0" y2="0">
-            <stop offset="0%" stop-color="#000" stop-opacity="0.5"/>
-            <stop offset="100%" stop-color="#000" stop-opacity="0"/>
-          </linearGradient>
+        <linearGradient id="bottomFade" x1="0" y1="1" x2="0" y2="0">
+          <stop offset="0%" stop-color="#000" stop-opacity="0.75"/>
+          <stop offset="70%" stop-color="#000" stop-opacity="0.4"/>
+          <stop offset="100%" stop-color="#000" stop-opacity="0"/>
+        </linearGradient>
+
         </defs>
         <rect x="0" y="0" width="${width}" height="${height}" fill="url(#bottomFade)" />
       `);
@@ -135,11 +137,26 @@ app.post('/generate-image', async (req, res) => {
       currentY += betweenSections - lineHeight;
     };
     
-    const contentOrder = settings.contentOrder || ['title', 'year', 'genre', 'director', 'music', 'actors', 'rating', 'tags'];
+    const titleLength = title.length;
+
+    const titleFontSize = titleLength > 40 ? 52 : 64;
+
+    svgParts.push(`
+      <style>
+        .title {
+          fill: #fff;
+          font-size: ${titleFontSize}px;
+          font-weight: 700;
+          font-family: 'SF Pro Display', 'Segoe UI', sans-serif;
+        }
+      </style>
+    `);
+
+        const contentOrder = settings.contentOrder || ['title', 'year', 'genre', 'director', 'music', 'actors', 'rating', 'tags'];
 
     for (const key of contentOrder) {
       if (key === 'title' && settings.showTitle) {
-        addWrappedLine(title, 'title', 40);
+        addWrappedLine(title, 'title', 32);
       } else if (key === 'year' && settings.showYear && tmdb.release_date) {
         svgParts.push(`<text x="${width / 2}" y="${currentY}" text-anchor="middle" class="year">${tmdb.release_date.slice(0, 4)}</text>`);
         currentY += lineHeight + betweenSections - lineHeight;
@@ -199,7 +216,7 @@ app.post('/generate-image', async (req, res) => {
     const svgText = `
     <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
       <style>
-        .title { fill: #fff; font-size: 64px; font-weight: 700; font-family: 'SF Pro Display', 'Segoe UI', sans-serif; }
+        .title { fill: #fff; font-size: 54px; font-weight: 700; font-family: 'SF Pro Display', 'Segoe UI', sans-serif; }
         .year, .user { fill: #aaa; font-size: 34px; font-family: 'SF Pro Text', 'Segoe UI', sans-serif; }
         .genre { fill: #ccc; font-size: 28px; font-family: 'SF Pro Text', 'Segoe UI', sans-serif; }
         .label { fill: #aaa; font-size: 32px; font-family: 'SF Pro Text', 'Segoe UI', sans-serif; }
