@@ -2,14 +2,37 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Letterboxd Image Generator</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Create stylish, shareable posters from your Letterboxd film reviews with customizable layout and design." />
+  <meta name="theme-color" content="#1c1c1e" />
+  <title>Letterboxd Poster Generator</title>
+  <!-- Primary favicon -->
+  <link rel="icon" type="image/png" href="assets/favicon.png" sizes="32x32">
+
+  <!-- Apple home screen icon -->
+  <link rel="apple-touch-icon" href="assets/favicon.png" sizes="180x180">
+
+  <!-- Optional fallback SVG for desktop browsers -->
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+
   <link rel="stylesheet" href="styles.css" />
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
 </head>
 <body>
+  <div id="loading-overlay">
+  <i class="fa-brands fa-letterboxd fa-beat-fade"></i>
+  <p>Generating poster...</p>
+</div>
+<div id="loading-overlay">
+    <i class="fa-brands fa-letterboxd fa-beat-fade"></i>
+    <p>Generating poster...</p>
+  </div>
+
   <div class="container">
-    <h1>🎬 Letterboxd Image Generator</h1>
+    <h1>Letterboxd Image Generator</h1>
 
     <form id="image-form">
       <div class="card">
@@ -18,21 +41,20 @@
         <button type="submit">Generate Image</button>
       </div>
 
-      <details id="settings-panel" class="card">
+      <details class="card details" id="settings-panel">
         <summary>⚙️ Advanced Settings</summary>
 
         <h2>🛠️ Customize Metadata Order</h2>
         <ul id="reorder-list">
-            <li data-id="title"><span class="drag-handle">☰</span> <input type="checkbox" id="show-title" checked> Title</li>
-            <li data-id="year"><span class="drag-handle">☰</span> <input type="checkbox" id="show-year" checked> Year</li>
-            <li data-id="director"><span class="drag-handle">☰</span> <input type="checkbox" id="show-director" checked> Director</li>
-            <li data-id="actors"><span class="drag-handle">☰</span> <input type="checkbox" id="show-actors" checked> Actors</li>
-            <li data-id="genre"><span class="drag-handle">☰</span> <input type="checkbox" id="show-genre" checked> Genre</li>
-            <li data-id="rating"><span class="drag-handle">☰</span> <input type="checkbox" id="show-rating" checked> Rating</li>
-            <li data-id="tags"><span class="drag-handle">☰</span> <input type="checkbox" id="show-tags" checked> Tags</li>
-            <li data-id="music"><span class="drag-handle">☰</span> <input type="checkbox" id="show-music"> Music</li>
-          </ul>
-          
+          <li data-id="title"><span class="drag-handle">☰</span><input type="checkbox" id="show-title" checked> Title</li>
+          <li data-id="year"><span class="drag-handle">☰</span><input type="checkbox" id="show-year" checked> Year</li>
+          <li data-id="director"><span class="drag-handle">☰</span><input type="checkbox" id="show-director" checked> Director</li>
+          <li data-id="actors"><span class="drag-handle">☰</span><input type="checkbox" id="show-actors" checked> Actors</li>
+          <li data-id="genre"><span class="drag-handle">☰</span><input type="checkbox" id="show-genre" checked> Genre</li>
+          <li data-id="rating"><span class="drag-handle">☰</span><input type="checkbox" id="show-rating" checked> Rating</li>
+          <li data-id="tags"><span class="drag-handle">☰</span><input type="checkbox" id="show-tags" checked> Tags</li>
+          <li data-id="music"><span class="drag-handle">☰</span><input type="checkbox" id="show-music"> Music</li>
+        </ul>
 
         <h2>🎨 Visual Settings</h2>
         <label><input type="checkbox" id="blur-backdrop" checked> Blur Backdrop</label>
@@ -44,7 +66,7 @@
         <label>Poster Scale: <span id="poster-scale-value">1.0</span>x</label>
         <input type="range" id="poster-scale" min="0.5" max="2.0" step="0.1" value="1.0">
 
-        <label>Footer Scale: <span id="footer-scale-value">1.2</span>x</label>
+        <label>Footer Scale: <span id="footer-scale-value">1.0</span>x</label>
         <input type="range" id="footer-scale" min="0.5" max="2.0" step="0.1" value="1.0">
 
         <label>Poster Top Margin: <span id="poster-top-value">240</span>px</label>
@@ -61,6 +83,7 @@
       </details>
 
       <div id="progress" class="progress" style="display:none"></div>
+
       <div id="result" class="result" style="display:none">
         <img id="generated-image" alt="Generated Image" />
         <div class="buttons">
@@ -71,103 +94,104 @@
     </form>
   </div>
 
-  <script>
-    document.addEventListener('DOMContentLoaded', () => {
-      // Live value display for sliders
-      const sliderIds = [
-        'poster-top', 'title-below-poster', 'line-height',
-        'between-sections', 'backdrop-brightness', 'poster-scale', 'footer-scale'
-      ];
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    // Live update slider labels
+    const sliderIds = [
+      'poster-top', 'title-below-poster', 'line-height',
+      'between-sections', 'backdrop-brightness', 'poster-scale', 'footer-scale'
+    ];
 
-      sliderIds.forEach(id => {
-        const input = document.getElementById(id);
-        const display = document.getElementById(`${id}-value`);
-        input.addEventListener('input', () => {
-          display.textContent = parseFloat(input.value);
-        });
-      });
-
-      // SortableJS for drag
-      Sortable.create(document.getElementById('reorder-list'), {
-        animation: 150,
-        handle: '.drag-handle',
-        ghostClass: 'sortable-ghost',
-        touchStartThreshold: 10
-      });
-
-      // Form submit
-      document.getElementById('image-form').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const progress = document.getElementById('progress');
-        const result = document.getElementById('result');
-        const generatedImage = document.getElementById('generated-image');
-        const copyButton = document.getElementById('copy-image');
-        const downloadButton = document.getElementById('download-image');
-
-        progress.style.display = 'block';
-        progress.textContent = 'Generating...';
-        result.style.display = 'none';
-
-        const order = Array.from(document.querySelectorAll('#reorder-list li')).map(li => li.dataset.id);
-
-        const settings = {
-          contentOrder: order,
-          showTitle: document.getElementById('show-title').checked,
-          showYear: document.getElementById('show-year').checked,
-          showGenre: document.getElementById('show-genre').checked,
-          showDirector: document.getElementById('show-director').checked,
-          showMusic: document.getElementById('show-music').checked,
-          showActors: document.getElementById('show-actors').checked,
-          showRating: document.getElementById('show-rating').checked,
-          showTags: document.getElementById('show-tags').checked,
-          blurBackdrop: document.getElementById('blur-backdrop').checked,
-          gradientOverlay: document.getElementById('gradient-toggle').checked,
-          backdropBrightness: parseFloat(document.getElementById('backdrop-brightness').value) / 100,
-          posterScale: parseFloat(document.getElementById('poster-scale').value),
-          footerScale: parseFloat(document.getElementById('footer-scale').value),
-          spacing: {
-            posterTop: parseInt(document.getElementById('poster-top').value),
-            titleBelowPoster: parseInt(document.getElementById('title-below-poster').value),
-            lineHeight: parseInt(document.getElementById('line-height').value),
-            betweenSections: parseInt(document.getElementById('between-sections').value),
-          }
-        };
-
-        try {
-          const res = await fetch('/generate-image', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              letterboxdUrl: document.getElementById('letterboxd-url').value,
-              settings
-            })
-          });
-
-          if (!res.ok) throw new Error('Failed to generate image');
-
-          const blob = await res.blob();
-          const url = URL.createObjectURL(blob);
-          generatedImage.src = url;
-          result.style.display = 'block';
-          progress.style.display = 'none';
-
-          copyButton.onclick = async () => {
-            await navigator.clipboard.write([new ClipboardItem({ 'image/jpeg': blob })]);
-            alert('Image copied to clipboard!');
-          };
-
-          downloadButton.onclick = () => {
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'letterboxd-poster.jpg';
-            a.click();
-          };
-
-        } catch (err) {
-          progress.textContent = 'Error: ' + err.message;
-        }
+    sliderIds.forEach(id => {
+      const input = document.getElementById(id);
+      const display = document.getElementById(`${id}-value`);
+      input.addEventListener('input', () => {
+        display.textContent = parseFloat(input.value);
       });
     });
-  </script>
+
+    // Sortable list
+    Sortable.create(document.getElementById('reorder-list'), {
+      animation: 150,
+      handle: '.drag-handle',
+      ghostClass: 'sortable-ghost',
+      touchStartThreshold: 10
+    });
+
+    const overlay = document.getElementById('loading-overlay');
+    const result = document.getElementById('result');
+    const generatedImage = document.getElementById('generated-image');
+    const copyButton = document.getElementById('copy-image');
+    const downloadButton = document.getElementById('download-image');
+
+    document.getElementById('image-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      overlay.classList.add('show'); // fade-in loading screen
+      result.style.display = 'none';
+
+      // Gather settings fresh on submit
+      const order = Array.from(document.querySelectorAll('#reorder-list li')).map(li => li.dataset.id);
+      const settings = {
+        contentOrder: order,
+        showTitle: document.getElementById('show-title').checked,
+        showYear: document.getElementById('show-year').checked,
+        showGenre: document.getElementById('show-genre').checked,
+        showDirector: document.getElementById('show-director').checked,
+        showMusic: document.getElementById('show-music').checked,
+        showActors: document.getElementById('show-actors').checked,
+        showRating: document.getElementById('show-rating').checked,
+        showTags: document.getElementById('show-tags').checked,
+        blurBackdrop: document.getElementById('blur-backdrop').checked,
+        gradientOverlay: document.getElementById('gradient-toggle').checked,
+        backdropBrightness: parseFloat(document.getElementById('backdrop-brightness').value) / 100,
+        posterScale: parseFloat(document.getElementById('poster-scale').value),
+        footerScale: parseFloat(document.getElementById('footer-scale').value),
+        spacing: {
+          posterTop: parseInt(document.getElementById('poster-top').value),
+          titleBelowPoster: parseInt(document.getElementById('title-below-poster').value),
+          lineHeight: parseInt(document.getElementById('line-height').value),
+          betweenSections: parseInt(document.getElementById('between-sections').value),
+        }
+      };
+
+      try {
+        const res = await fetch('/generate-image', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            letterboxdUrl: document.getElementById('letterboxd-url').value,
+            settings
+          })
+        });
+
+        if (!res.ok) throw new Error('Failed to generate image');
+
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        generatedImage.src = url;
+        result.style.display = 'block';
+        overlay.classList.remove('show');
+
+        copyButton.onclick = async () => {
+          await navigator.clipboard.write([new ClipboardItem({ 'image/jpeg': blob })]);
+          alert('Image copied to clipboard!');
+        };
+
+        downloadButton.onclick = () => {
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = 'letterboxd-poster.jpg';
+          a.click();
+        };
+        
+
+      } catch (err) {
+        alert('Error: ' + err.message);
+        overlay.classList.remove('show');
+      }
+    });
+  });
+</script>
+
 </body>
 </html>

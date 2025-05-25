@@ -1,214 +1,186 @@
-/* === SVG Font Styling (Poster Output) === */
-
-.stars {
-  fill: gold;
-  font-size: 60px;
-  font-family: 'SF Pro Rounded', 'Segoe UI', sans-serif;
-  letter-spacing: 8px;
-}
-
-.stars::after {
-  content: "☆☆☆☆☆";
-}
-
-.rating-container {
-  fill: gold;
-  font-size: 60px;
-  font-family: 'SF Pro Rounded', 'Segoe UI', sans-serif;
-  letter-spacing: 8px;
-}
-
-.tags {
-  fill: #ccc;
-  font-size: 28px;
-  font-style: italic;
-  font-family: 'SF Pro Text', 'Segoe UI', sans-serif;
-}
-
-.genre {
-  fill: #ccc;
-  font-size: 28px;
-  font-family: 'SF Pro Text', 'Segoe UI', sans-serif;
-}
-
-.actors {
-  fill: #ddd;
-  font-size: 30px;
-  font-family: 'SF Pro Text', 'Segoe UI', sans-serif;
-  font-style: italic;
-}
-
-.title {
-  fill: #fff;
-  font-size: 64px;
-  font-weight: 700;
-  font-family: 'SF Pro Display', 'Segoe UI', sans-serif;
-  line-height: 1.2;
-}
-
-.year,
-.user {
-  fill: #aaa;
-  font-size: 34px;
-  font-family: 'SF Pro Text', 'Segoe UI', sans-serif;
-}
-
-.label {
-  fill: #aaa;
-  font-size: 32px;
-  font-family: 'SF Pro Text', 'Segoe UI', sans-serif;
-}
-
-.bold {
-  fill: #fff;
-  font-weight: bold;
-  font-size: 32px;
-  font-family: 'SF Pro Text', 'Segoe UI', sans-serif;
-}
-
-.logo {
-  opacity: 0.3;
-}
-
-
-/* === UI Layout & Controls (Frontend) === */
+/* iOS-style dark mode UI for Letterboxd Poster Generator - Revamped */
 
 body {
-  background: #121212;
-  color: #eee;
-  font-family: 'Segoe UI', sans-serif;
   margin: 0;
-  padding: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  background-color: #1c1c1e;
+  color: #f2f2f7;
 }
 
 .container {
-  max-width: 720px;
-  margin: 0 auto;
-  padding: 20px;
+  max-width: 600px;
+  margin: auto;
+  padding: 1.5rem;
 }
 
-h1, h2 {
-  color: #0cf;
+h1 {
+  font-size: 28px;
+  font-weight: 700;
+  text-align: center;
+  color: #f2f2f7;
+  margin-bottom: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
 }
 
-.card {
-  background: #1e1e1e;
-  border-radius: 12px;
-  padding: 20px;
-  margin: 20px 0;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+h1::before {
+  content: '';
+  display: inline-block;
+  width: 28px;
+  height: 28px;
 }
 
-input[type="url"],
-input[type="range"] {
-  width: 100%;
-  padding: 10px;
-  margin: 8px 0 16px;
-  border-radius: 6px;
-  border: none;
-  background: #2c2c2c;
-  color: #eee;
+.card, details {
+  background: #2c2c2e;
+  border-radius: 20px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  padding: 1.25rem;
+  margin: 1.5rem;
+  border: 1px solid #3a3a3c;
+}
+
+label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
   font-size: 16px;
 }
 
 input[type="checkbox"] {
-  margin-right: 8px;
+  transform: scale(1.2);
+  accent-color: #0a84ff;
+}
+
+input[type="url"] {
+  width: 95%;
+  padding: 0.75rem;
+  font-size: 16px;
+  border-radius: 12px;
+  border: 1px solid #555;
+  background-color: #3a3a3c;
+  color: #fff;
+  margin-top: 0.25rem;
+  margin-bottom: 1rem;
+}
+
+input[type="range"] {
+  width: 100%;
+  margin-bottom: 1rem;
 }
 
 button {
-  background: #00b0ff;
-  color: #fff;
+  background-color: #0a84ff;
+  color: white;
   border: none;
-  border-radius: 8px;
-  padding: 12px 24px;
+  padding: 0.75rem 1.25rem;
   font-size: 16px;
+  border-radius: 12px;
   cursor: pointer;
-  transition: 0.3s ease;
+  transition: background-color 0.2s ease;
   width: 100%;
-  margin-top: 12px;
+  margin-top: 1rem;
 }
 
 button:hover {
-  background: #0095e0;
+  background-color: #006edc;
 }
 
-#reorder-list {
+.details summary {
+  font-weight: bold;
+  font-size: 17px;
+  cursor: pointer;
+  margin-bottom: 1rem;
+  color: #f2f2f7;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.details summary::-webkit-details-marker {
+  display: none;
+}
+
+.drag-handle {
+  margin-right: 0.5rem;
+  cursor: grab;
+  user-select: none;
+}
+
+ul#reorder-list {
   list-style: none;
   padding: 0;
   margin: 0;
-  border: 1px solid #333;
-  border-radius: 8px;
-  background: #2a2a2a;
 }
 
-#reorder-list li {
-  padding: 10px 16px;
-  border-bottom: 1px solid #444;
-  cursor: grab;
+ul#reorder-list li {
   display: flex;
   align-items: center;
-  gap: 10px;
+  padding: 0.5rem;
+  border-radius: 10px;
+  background: #3a3a3c;
+  border: 1px solid #555;
+  margin-bottom: 0.5rem;
+  color: #f2f2f7;
 }
 
-#reorder-list li:last-child {
-  border-bottom: none;
-}
-
-details summary {
-  cursor: pointer;
-  font-weight: bold;
-  margin-bottom: 10px;
-  color: #0cf;
-}
-
-.progress,
-.result {
+#result {
   text-align: center;
-  margin-top: 20px;
+  margin-top: 2rem;
 }
 
-img#generated-image {
-  width: 100%;
-  border-radius: 12px;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+#result img {
+  max-width: 100%;
+  border-radius: 20px;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.5);
 }
 
 .buttons {
   display: flex;
-  justify-content: space-between;
-  gap: 10px;
-  margin-top: 16px;
+  justify-content: space-around;
+  margin-top: 1rem;
 }
 
 .buttons button {
+  width: auto;
   flex: 1;
+  margin: 0 0.5rem;
 }
 
-@media (max-width: 768px) {
-  .settings {
-    margin-top: 20px;
-  }
-  #reorder-list li {
-    padding: 16px;
-  }
-  .container {
-    padding: 1rem;
-  }
-  .card {
-    margin: 0;
-    padding: 1rem;
-  }
+#loading-overlay {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0,0,0,0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+  z-index: 9999;
 }
 
-@media (min-width: 769px) {
-  #settings-panel {
-    display: block;
-  }
-  details[open] summary::after {
-    content: "▲";
-  }
-  summary::after {
-    content: "▼";
-    float: right;
-  }
+#loading-overlay.show {
+  opacity: 1;
+  pointer-events: all;
+}
+
+#loading-overlay i {
+  font-size: 100px;
+  margin-bottom: 16px;
+  color: #00d474;
+}
+
+#loading-overlay p {
+  font-size: 14px;
+  color: #ccc;
+  font-family: 'SF Pro Text', 'Segoe UI', sans-serif;
+  margin: 0;
+  text-align: center;
 }
