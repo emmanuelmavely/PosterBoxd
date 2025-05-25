@@ -3,7 +3,7 @@
 
 Creates a stylized 9:16 poster for a Letterboxd film review — perfect for sharing on social media.
 
-![screenshot](public/assets/demo.jpg) <!-- optional: replace with your image -->
+![screenshot](public/assets/demo.png)
 
 ## ✨ Features
 
@@ -30,7 +30,7 @@ Creates a stylized 9:16 poster for a Letterboxd film review — perfect for shar
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/letterboxd-poster.git
+git clone https://github.com/emmanuelmavely/letterboxd-poster.git
 cd letterboxd-poster
 ```
 
@@ -92,4 +92,4 @@ MIT — feel free to use and modify.
 
 ---
 
-> Built with ❤️ by [YourName]
+> Built with ❤️ by Emmanuel Mavely
