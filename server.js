@@ -213,3 +213,9 @@ app.post('/generate-image', async (req, res) => {
 });
 
 app.listen(process.env.PORT || 3000, () => console.log('🚀 Server running on port 3000'));
+
+//Server-alive
+app.get('/ping', (req, res) => {
+  res.send('pong');
+});
+
