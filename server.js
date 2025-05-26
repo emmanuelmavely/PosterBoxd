@@ -40,25 +40,51 @@ function wrapText(text, maxChars) {
   return lines;
 }
 
-async function fetchTmdbData(title) {
-  const searchRes = await fetch(`https://api.themoviedb.org/3/search/movie?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(title)}`);
-  const searchData = await searchRes.json();
-  const movie = searchData.results?.[0];
-  if (!movie) throw new Error('No TMDb result');
 
-  const details = await fetch(`https://api.themoviedb.org/3/movie/${movie.id}?api_key=${TMDB_API_KEY}`).then(r => r.json());
-  const credits = await fetch(`https://api.themoviedb.org/3/movie/${movie.id}/credits?api_key=${TMDB_API_KEY}`).then(r => r.json());
+async function fetchTmdbData(title, year = '', expectedDirector = '') {
+  const searchUrl = `https://api.themoviedb.org/3/search/movie?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(title)}${year ? `&year=${year}` : ''}`;
+  const searchRes = await fetch(searchUrl);
+  const searchData = await searchRes.json();
+  const candidates = searchData.results;
+
+  if (!candidates || !candidates.length) throw new Error('No TMDb results');
+
+  for (const movie of candidates) {
+    const creditsUrl = `https://api.themoviedb.org/3/movie/${movie.id}/credits?api_key=${TMDB_API_KEY}`;
+    const credits = await fetch(creditsUrl).then(res => res.json());
+    const director = credits.crew.find(c => c.job === 'Director')?.name || '';
+
+    if (expectedDirector && director.toLowerCase().includes(expectedDirector.toLowerCase())) {
+      const details = await fetch(`https://api.themoviedb.org/3/movie/${movie.id}?api_key=${TMDB_API_KEY}`).then(res => res.json());
+      return {
+        poster: movie.poster_path ? `https://image.tmdb.org/t/p/w500${movie.poster_path}` : null,
+        backdrop: movie.backdrop_path ? `https://image.tmdb.org/t/p/w1280${movie.backdrop_path}` : null,
+        release_date: movie.release_date || '',
+        genre: details.genres?.map(g => g.name) || [],
+        director,
+        musicDirector: credits.crew.find(c => c.job === 'Original Music Composer')?.name || '',
+        actors: credits.cast?.slice(0, 3).map(c => c.name) || []
+      };
+    }
+  }
+
+  // fallback to top result
+  const fallback = candidates[0];
+  const fallbackCredits = await fetch(`https://api.themoviedb.org/3/movie/${fallback.id}/credits?api_key=${TMDB_API_KEY}`).then(r => r.json());
+  const fallbackDetails = await fetch(`https://api.themoviedb.org/3/movie/${fallback.id}?api_key=${TMDB_API_KEY}`).then(r => r.json());
 
   return {
-    poster: movie.poster_path ? `https://image.tmdb.org/t/p/w500${movie.poster_path}` : null,
-    backdrop: movie.backdrop_path ? `https://image.tmdb.org/t/p/w780${movie.backdrop_path}` : null,
-    release_date: movie.release_date || '',
-    genre: details.genres?.map(g => g.name) || [],
-    director: credits.crew.find(c => c.job === 'Director')?.name || '',
-    musicDirector: credits.crew.find(c => c.job === 'Original Music Composer')?.name || '',
-    actors: credits.cast?.slice(0, 3).map(c => c.name) || []
+    poster: fallback.poster_path ? `https://image.tmdb.org/t/p/w500${fallback.poster_path}` : null,
+    backdrop: fallback.backdrop_path ? `https://image.tmdb.org/t/p/w1280${fallback.backdrop_path}` : null,
+    release_date: fallback.release_date || '',
+    genre: fallbackDetails.genres?.map(g => g.name) || [],
+    director: fallbackCredits.crew.find(c => c.job === 'Director')?.name || '',
+    musicDirector: fallbackCredits.crew.find(c => c.job === 'Original Music Composer')?.name || '',
+    actors: fallbackCredits.cast?.slice(0, 3).map(c => c.name) || []
   };
 }
+
+
 
 app.post('/generate-image', async (req, res) => {
   try {
@@ -66,15 +92,30 @@ app.post('/generate-image', async (req, res) => {
     const response = await fetch(letterboxdUrl);
     const html = await response.text();
     const $ = cheerio.load(html);
-    const title = $('h2.headline-2 a').first().text().trim();
+
+    const title = $('.film-title-wrapper a').first().text().trim();
+    const yearGuess = $('.film-title-wrapper .metadata a').first().text().trim();
+
+
+    // ✅ Extract director from meta tag or film page (fallback to text under credit)
+    const directorText = $('a[href*="/director/"]').first().text().trim();
+
+    console.log('Letterboxd parsed title:', title);
+    console.log('Year:', yearGuess);
+    console.log('Username:', username);
+
+    // ✅ Now pass these to fetchTmdbData
+    const tmdb = await fetchTmdbData(title, yearGuess, directorText);
+
     const rating = ($('.rating-large').attr('class')?.match(/rated-large-(\d+)/)?.[1] || 0) / 2;
     const match = response.url.match(/letterboxd\.com\/([^\/]+)/);
-    const username = match ? match[1] : 'Unknown';
+    const username = $('.person-summary .name span').first().text().trim();
+
 
     const tags = [];
     $('ul.tags li a').each((_, el) => tags.push($(el).text().trim()));
 
-    const tmdb = await fetchTmdbData(title);
+
 
     const width = 1080, height = 1920;
     const spacing = settings.spacing || {};
