@@ -24,7 +24,7 @@ Creates a stylized 9:16 poster for a Letterboxd film review — perfect for shar
 
 ## 🚀 Live Demo
 
-letterboxd-poster.onrender.com
+[Live Demo](https://letterboxd-poster.onrender.com)
 
 ---
 
