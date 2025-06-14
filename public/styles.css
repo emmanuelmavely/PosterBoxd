@@ -54,6 +54,7 @@ input[type="checkbox"] {
   accent-color: #0a84ff;
 }
 
+input[type="text"],
 input[type="url"] {
   width: 95%;
   padding: 0.75rem;

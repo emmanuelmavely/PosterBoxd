@@ -1,4 +1,4 @@
-  document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', () => {
     // Live update slider labels
     const sliderIds = [
       'poster-top', 'title-below-poster', 'line-height',
@@ -32,6 +32,16 @@
       overlay.classList.add('show'); // fade-in loading screen
       result.style.display = 'none';
 
+      // Extract URL from the share text
+      const shareText = document.getElementById('letterboxd-url').value.trim();
+      const urlMatch = shareText.match(/(https:\/\/(?:boxd\.it|letterboxd\.com)\/[^\s]+)/);
+      if (!urlMatch) {
+        alert('Please provide a valid Letterboxd URL.');
+        overlay.classList.remove('show');
+        return;
+      }
+      const letterboxdUrl = urlMatch[1];
+
       // Gather settings fresh on submit
       const order = Array.from(document.querySelectorAll('#reorder-list li')).map(li => li.dataset.id);
       const settings = {
@@ -44,6 +54,7 @@
         showActors: document.getElementById('show-actors').checked,
         showRating: document.getElementById('show-rating').checked,
         showTags: document.getElementById('show-tags').checked,
+        showRuntime: document.getElementById('show-runtime').checked, // New checkbox
         blurBackdrop: document.getElementById('blur-backdrop').checked,
         gradientOverlay: document.getElementById('gradient-toggle').checked,
         backdropBrightness: parseFloat(document.getElementById('backdrop-brightness').value) / 100,

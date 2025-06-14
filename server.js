@@ -61,6 +61,13 @@ async function fetchTmdbData(title, year = '', expectedDirector = '') {
   return { movie: fallback, details, credits };
 }
 
+// Convert runtime to hours and minutes
+function formatRuntime(runtime) {
+  const hours = Math.floor(runtime / 60);
+  const minutes = runtime % 60;
+  return `${hours}h ${minutes}min`;
+}
+
 app.post('/generate-image', async (req, res) => {
   try {
     const { letterboxdUrl, settings = {} } = req.body;
@@ -134,12 +141,14 @@ app.post('/generate-image', async (req, res) => {
 
     const contentOrder = settings.contentOrder || ['title', 'year', 'genre', 'director', 'actors', 'rating', 'tags', 'music'];
     const rating = ($('.rating-large').attr('class')?.match(/rated-large-(\d+)/)?.[1] || 0) / 2;
+    const runtime = details.runtime ? formatRuntime(details.runtime) : null;
 
     for (const key of contentOrder) {
       if (key === 'title' && settings.showTitle) addWrappedLine(title, 'title', 36);
       else if (key === 'year' && settings.showYear && year) addWrappedLine(year, 'year');
       else if (key === 'genre' && settings.showGenre && genre.length) addWrappedLine(genre.join(' | '), 'genre');
       else if (key === 'director' && settings.showDirector && director) addWrappedLine(`directed by ${director}`, 'label');
+      else if (key === 'runtime' && settings.showRuntime && runtime) addWrappedLine(runtime, 'label'); // Updated runtime format
       else if (key === 'music' && settings.showMusic && musicDirector) addWrappedLine(`music by ${musicDirector}`, 'label');
       else if (key === 'actors' && settings.showActors && actors.length) addWrappedLine(actors.join(', '), 'actors', 60);
       else if (key === 'rating' && settings.showRating && rating) {
