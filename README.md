@@ -26,7 +26,7 @@ Create stylish, shareable 9:16 posters for your Letterboxd film reviews — perf
 
 [Live Demo](https://posterboxd.onrender.com)
 
-###Demo Output
+### Demo Output
 <p align="center">
   <img src="public/assets/demo.png" alt="PosterBoxd Logo" width="300"/>
 </p>

@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: PosterBoxd
+    env: node
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: TMDB_API_KEY
+        value: <your-tmdb-api-key>
