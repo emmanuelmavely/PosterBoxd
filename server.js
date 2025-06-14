@@ -78,7 +78,7 @@ function formatRuntime(runtime) {
 }
 
 async function generatePosterImage(movieData, settings, selectedPosterIndex = 0, selectedBackgroundIndex = 0) {
-  const { movie, details, credits, images, tags, username, rating, isLiked } = movieData;
+  const { movie, details, credits, images, tags, username, rating, isLiked, watchedDate } = movieData;
   
   // Get selected poster and backdrop
   const posters = [movie.poster_path, ...(images.posters?.slice(0, 5).map(p => p.file_path) || [])].filter(Boolean);
@@ -178,15 +178,23 @@ async function generatePosterImage(movieData, settings, selectedPosterIndex = 0,
     }
   }
 
-  // Footer
-  const footerY = height - 130;
+  // Footer with watched date
+  const footerY = height - (watchedDate ? 160 : 130); // Adjust footer position if watched date exists
   const logoW = Math.round(160 * footerScale);
   const logoH = Math.round(22 * footerScale);
+  
   svgParts.push(
     `<text x="${width / 2}" y="${footerY}" text-anchor="middle" class="footer-username">${escapeXml(username)}</text>`,
     `<text x="${width / 2}" y="${footerY + 26}" text-anchor="middle" class="footer-on">— on —</text>`,
     `<image x="${(width - logoW) / 2}" y="${footerY + 40}" width="${logoW}" height="${logoH}" xlink:href="${logoDataUrl}" class="logo-footer" />`
   );
+
+  // Add watched date above footer if available and enabled
+  if (watchedDate && settings.showWatchedDate) {
+    svgParts.push(
+      `<text x="${width / 2}" y="${footerY - 60}" text-anchor="middle" class="watched-date">Watched on ${escapeXml(watchedDate)}</text>`
+    );
+  }
 
   const textSvg = `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
     <style>
@@ -201,6 +209,7 @@ async function generatePosterImage(movieData, settings, selectedPosterIndex = 0,
       .heart { fill: #ff9010; font-size: 60px; font-family: 'SF Pro Rounded', 'Segoe UI', sans-serif; }
       .footer-username { fill: #fff; font-size: 30px; font-weight: bold; font-family: 'SF Pro Text', 'Segoe UI', sans-serif; }
       .footer-on { fill: #aaa; font-size: 20px; font-family: 'SF Pro Text', 'Segoe UI', sans-serif; }
+      .watched-date { fill: #666; font-size: 24px; font-style: SF Pro Text; font-family: 'SF Pro Text', 'Segoe UI', sans-serif; opacity: 0.8; }
       .logo-footer { opacity: 0.9; }
     </style>
     ${svgParts.join('\n')}
@@ -244,10 +253,24 @@ app.post('/generate-image', async (req, res) => {
     // Check if the review is liked (heart present)
     const isLiked = $('.icon-liked').length > 0;
 
+    // Extract watched date
+    let watchedDate = null;
+    const viewDateElement = $('.view-date.date-links');
+    if (viewDateElement.length) {
+      const dateLinks = viewDateElement.find('a');
+      if (dateLinks.length >= 3) {
+        const day = $(dateLinks[0]).text().trim();
+        const month = $(dateLinks[1]).text().trim();
+        const year = $(dateLinks[2]).text().trim();
+        watchedDate = `${day} ${month} ${year}`;
+      }
+    }
+
     console.log('🎬 Title:', title);
     console.log('📅 Year:', year);
     console.log('🎞️ Director:', directorText);
     console.log('👤 Username:', username);
+    console.log('📅 Watched on:', watchedDate);
     console.log('❤️ Liked:', isLiked);
 
     const { movie, details, credits, images } = await fetchTmdbData(title, year, directorText);
@@ -259,6 +282,7 @@ app.post('/generate-image', async (req, res) => {
       tags,
       rating,
       isLiked,
+      watchedDate, // Add watched date to movie data
       movie,
       details,
       credits,
