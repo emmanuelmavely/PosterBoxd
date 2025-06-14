@@ -201,3 +201,86 @@ ul#reorder-list li {
 .bold {
   font-weight: bold;
 }
+
+.menu-bar {
+  margin: 1.5rem 0;
+  padding: 1rem;
+  background: #2c2c2e;
+  border-radius: 16px;
+  border: 1px solid #3a3a3c;
+}
+
+.menu-section {
+  margin-bottom: 1.5rem;
+}
+
+.menu-section:last-child {
+  margin-bottom: 0;
+}
+
+.menu-section h3 {
+  font-size: 16px;
+  font-weight: 600;
+  color: #f2f2f7;
+  margin: 0 0 0.75rem 0;
+}
+
+.poster-options,
+.background-options {
+  display: flex;
+  gap: 0.5rem;
+  overflow-x: auto;
+  padding: 0.25rem 0;
+}
+
+.option-item {
+  flex-shrink: 0;
+  width: 80px;
+  height: 120px;
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.option-item.active {
+  border-color: #0a84ff;
+  box-shadow: 0 0 0 2px rgba(10, 132, 255, 0.3);
+}
+
+.option-item:hover {
+  transform: scale(1.05);
+  border-color: #0a84ff;
+}
+
+.option-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.background-options .option-item {
+  height: 45px;
+}
+
+.option-item.loading {
+  background: #3a3a3c;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #8e8e93;
+  font-size: 12px;
+}
+
+.option-item.no-image {
+  background: #48484a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #8e8e93;
+  font-size: 10px;
+  text-align: center;
+  padding: 0.25rem;
+}
