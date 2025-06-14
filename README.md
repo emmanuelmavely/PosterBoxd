@@ -1,12 +1,12 @@
+# 🎬 PosterBoxd
 
-# 🎬 Letterboxd Poster Generator
-
-Creates a stylized 9:16 poster for a Letterboxd film review — perfect for sharing on social media.
+Create stylish, shareable 9:16 posters for your Letterboxd film reviews — perfect for social media.
 
 <p align="center">
-  <img src="public/assets/demo.png" alt="Screenshot" width="400"/>
+  <img src="public/assets/posterBoxd.png" alt="PosterBoxd Logo" width="300"/>
 </p>
 
+---
 
 ## ✨ Features
 
@@ -24,8 +24,12 @@ Creates a stylized 9:16 poster for a Letterboxd film review — perfect for shar
 
 ## 🚀 Live Demo
 
-[Live Demo](https://letterboxd-poster.onrender.com)
+[Live Demo](https://posterboxd.onrender.com)
 
+###Demo Output
+<p align="center">
+  <img src="public/assets/demo.png" alt="PosterBoxd Logo" width="300"/>
+</p>
 ---
 
 ## 🖥️ Local Setup
@@ -33,8 +37,8 @@ Creates a stylized 9:16 poster for a Letterboxd film review — perfect for shar
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/emmanuelmavely/letterboxd-poster.git
-cd letterboxd-poster
+git clone https://github.com/emmanuelmavely/posterboxd.git
+cd posterboxd
 ```
 
 ### 2. Install dependencies

@@ -185,3 +185,15 @@ ul#reorder-list li {
   margin: 0;
   text-align: center;
 }
+
+.logo-container {
+  text-align: center;
+  margin-bottom: 1.5rem;
+}
+
+.logo {
+  max-width: 100%; /* Ensures the logo scales down to fit the screen */
+  height: auto;    /* Maintains the aspect ratio */
+  max-height: 150px; /* Optional: Limits the height for smaller screens */
+  object-fit: contain;
+}
