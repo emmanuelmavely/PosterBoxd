@@ -147,10 +147,14 @@ app.post('/generate-image', async (req, res) => {
       if (key === 'title' && settings.showTitle) addWrappedLine(title, 'title', 36);
       else if (key === 'year' && settings.showYear && year) addWrappedLine(year, 'year');
       else if (key === 'genre' && settings.showGenre && genre.length) addWrappedLine(genre.join(' | '), 'genre');
-      else if (key === 'director' && settings.showDirector && director) addWrappedLine(`directed by ${director}`, 'label');
-      else if (key === 'runtime' && settings.showRuntime && runtime) addWrappedLine(runtime, 'label'); // Updated runtime format
-      else if (key === 'music' && settings.showMusic && musicDirector) addWrappedLine(`music by ${musicDirector}`, 'label');
-      else if (key === 'actors' && settings.showActors && actors.length) addWrappedLine(actors.join(', '), 'actors', 60);
+      else if (key === 'director' && settings.showDirector && director) {
+        svgParts.push(`<text x="${width / 2}" y="${currentY}" text-anchor="middle" class="label">directed by <tspan font-weight="bold">${escapeXml(director)}</tspan></text>`);
+        currentY += lineHeight;
+      } else if (key === 'runtime' && settings.showRuntime && runtime) addWrappedLine(runtime, 'label');
+      else if (key === 'music' && settings.showMusic && musicDirector) {
+        svgParts.push(`<text x="${width / 2}" y="${currentY}" text-anchor="middle" class="label">music by <tspan font-weight="bold">${escapeXml(musicDirector)}</tspan></text>`);
+        currentY += lineHeight;
+      } else if (key === 'actors' && settings.showActors && actors.length) addWrappedLine(actors.join(', '), 'actors', 60);
       else if (key === 'rating' && settings.showRating && rating) {
         const full = Math.floor(rating), half = rating % 1 >= 0.5, empty = 5 - full - (half ? 1 : 0);
         const stars = '★'.repeat(full) + (half ? '½' : '') + '☆'.repeat(empty);

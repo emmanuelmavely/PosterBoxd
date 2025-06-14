@@ -197,3 +197,7 @@ ul#reorder-list li {
   max-height: 150px; /* Optional: Limits the height for smaller screens */
   object-fit: contain;
 }
+
+.bold {
+  font-weight: bold;
+}
