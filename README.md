@@ -32,6 +32,14 @@ Create stylish, shareable 9:16 posters for your Letterboxd film reviews — perf
 </p>
 ---
 
+## 🚀 Deploy to Render
+
+You can deploy this project to [Render](https://render.com) with one click:
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy)
+
+---
+
 ## 🖥️ Local Setup
 
 ### 1. Clone the repository
