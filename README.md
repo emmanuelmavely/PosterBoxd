@@ -1,110 +1,131 @@
-# 🎬 PosterBoxd
+# PosterBoxd
 
-Create stylish, shareable 9:16 posters for your Letterboxd film reviews — perfect for social media.
-
-<p align="center">
-  <img src="public/assets/posterBoxd.png" alt="PosterBoxd Logo" width="300"/>
-</p>
+A web app to generate stylish, customizable posters from your Letterboxd reviews or any movie/TV series using TMDb data.
 
 ---
 
-## ✨ Features
+## Table of Contents
 
-- Extracts metadata from Letterboxd and TMDb:
-  - Title, Year, Director, Music, Genre, Rating, Actors, Tags
-- Beautifully styled for vertical mobile-friendly export
-- Customizable:
-  - Metadata order (via drag-and-drop)
-  - Visual style: backdrop blur, brightness, poster scale
-  - Optional gradient overlay and footer scaling
-- Mobile + desktop responsive UI
-- Supports JPEG download or clipboard copy
-
----
-
-## 🚀 Live Demo
-
-[Live Demo](https://posterboxd.onrender.com)
-
-### Demo Output
-<p align="center">
-  <img src="public/assets/demo.png" alt="PosterBoxd Logo" width="300"/>
-</p>
----
-
-## 🚀 Deploy to Render
-
-You can deploy this project to [Render](https://render.com) with one click:
-
-[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy)
+- [Overview](#overview)
+- [Features](#features)
+  - [Letterboxd Mode](#letterboxd-mode)
+  - [Custom Mode](#custom-mode)
+  - [TV Series Support](#tv-series-support)
+  - [Poster & Background Selection](#poster--background-selection)
+  - [Metadata & Layout Customization](#metadata--layout-customization)
+  - [Visual Customization](#visual-customization)
+  - [Responsive UI](#responsive-ui)
+- [Getting Started](#getting-started)
+- [Technical Details](#technical-details)
+- [Notes](#notes)
+- [License](#license)
 
 ---
 
-## 🖥️ Local Setup
+## Overview
 
-### 1. Clone the repository
+PosterBoxd lets you create high-quality, shareable posters for movies and TV series. It supports both Letterboxd review imports and custom TMDb searches, with advanced layout and visual customization.
 
-```bash
-git clone https://github.com/emmanuelmavely/posterboxd.git
-cd posterboxd
-```
+---
 
-### 2. Install dependencies
+## Features
 
-```bash
+### Letterboxd Mode
+
+- **Input:** Paste your Letterboxd share text or review URL.
+- **Data Extraction:** Automatically parses title, year, director, rating, tags, username, watched date, and liked status from the Letterboxd page.
+- **Poster Generation:** Fetches movie metadata and images from TMDb for accurate visuals.
+
+### Custom Mode
+
+- **Search:** Search for any movie or TV series using TMDb.
+- **Selection:** Choose from search results to autofill metadata.
+- **Manual Input:** Set your own rating, tags, username, and watched date.
+
+### TV Series Support
+
+- **Year Range & Status:** Displays the full run (e.g., `2017–2022 (Ended)`).
+- **Season/Episode/Runtime:** Shows average episode runtime, number of seasons, and episodes (e.g., `45min | 4 Seasons | 12 Episodes`).
+- **Created By:** Shows "created by" instead of "directed by" for TV series.
+
+### Poster & Background Selection
+
+- **Multiple Choices:** Select from main and alternative posters and backgrounds fetched from TMDb.
+- **Independent Selection:** Freely combine any poster with any background.
+
+### Metadata & Layout Customization
+
+- **Reorder Fields:** Drag-and-drop to reorder metadata fields (title, year, director/created by, genre/season info, runtime, actors, tags, rating, heart, watched date).
+- **Toggle Visibility:** Show/hide any metadata field using checkboxes.
+- **Heart Icon:** Only appears if both the review is liked and the "Heart (if liked)" setting is enabled.
+
+### Visual Customization
+
+- **Backdrop Blur:** Toggle background blur effect.
+- **Gradient Overlay:** Add a black gradient overlay for readability.
+- **Brightness:** Adjust backdrop brightness (0–100%).
+- **Poster/Footer Scaling:** Scale poster and footer logo independently.
+- **Spacing:** Fine-tune poster top margin, title offset, line height, and section spacing.
+
+### Responsive UI
+
+- **Modern Design:** iOS-style dark mode, mobile-friendly.
+- **Live Preview:** See changes instantly before downloading.
+- **Drag-and-Drop:** Reorder metadata fields interactively.
+
+---
+
+## Getting Started
+
+### 1. Install Dependencies
+
+```sh
 npm install
 ```
 
-### 3. Add TMDb API Key
+### 2. Set Up TMDb API Key
 
-Create a `.env` file in the root directory:
+Create a `.env` file in the project root:
 
-```env
+```
 TMDB_API_KEY=your_tmdb_api_key_here
 ```
 
-Get one from https://www.themoviedb.org/settings/api
+### 3. Start the Server
 
----
-
-### 4. Run the server
-
-```bash
-node server.js
+```sh
+npm start
 ```
 
-Then visit [http://localhost:3000](http://localhost:3000)
+### 4. Open in Browser
+
+Go to [http://localhost:3000](http://localhost:3000)
 
 ---
 
-## 🌐 Deployment (Render)
+## Technical Details
 
-To deploy full-stack:
-
-1. Push this repo to GitHub
-2. Go to [render.com](https://render.com)
-3. New → Web Service → Connect GitHub Repo
-4. Configure:
-   - **Start command**: `node server.js`
-   - **Root directory**: `/`
-   - **Environment**: Node
-   - **Add env var**: `TMDB_API_KEY=your_key`
-5. Deploy and you're live 🎉
+- **Backend:** Node.js (Express), uses `node-fetch` for HTTP requests, `cheerio` for HTML parsing, and `sharp` for image processing.
+- **Frontend:** Vanilla JS, CSS, HTML. Uses [SortableJS](https://sortablejs.github.io/Sortable/) for drag-and-drop.
+- **Image Generation:**  
+  - Combines TMDb images and SVG overlays for text/metadata.
+  - All layout and visual settings are applied server-side using `sharp`.
+- **Session Handling:**  
+  - Each poster generation creates a session ID for fast regeneration with different poster/background options.
+- **TV Series Logic:**  
+  - Uses TMDb's `created_by`, `status`, `first_air_date`, `last_air_date`, `number_of_seasons`, `number_of_episodes`, and `episode_run_time` fields.
 
 ---
 
-## 📝 License
+## Notes
 
-MIT — feel free to use and modify.
-
----
-
-## 🙌 Credits
-
-- Letterboxd metadata: [letterboxd.com](https://letterboxd.com)
-- Movie info: [TMDb API](https://developers.themoviedb.org/)
-- UI/UX: Custom drag & slider controls
+- Poster/background selection is independent—choose any combination.
+- All settings are customizable before generating your poster.
+- The heart icon only appears if both the review is liked and the "Heart (if liked)" setting is enabled.
+- For TV series, "created by" and season/episode/runtime info are shown instead of director/genre.
 
 ---
 
-> Built with ❤️ by Emmanuel Mavely
+## License
+
+MIT
