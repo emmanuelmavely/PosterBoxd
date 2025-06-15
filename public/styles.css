@@ -128,6 +128,21 @@ ul#reorder-list li {
   color: #f2f2f7;
 }
 
+ul#reorder-list li.non-reorderable {
+  background: #2a2a2c;
+  opacity: 0.8;
+  border: 1px solid #444;
+}
+
+ul#reorder-list li.non-reorderable .drag-handle.disabled {
+  color: #666;
+  cursor: not-allowed;
+}
+
+ul#reorder-list li.non-reorderable .drag-handle.disabled:hover {
+  color: #666;
+}
+
 #result {
   text-align: center;
   margin-top: 2rem;
@@ -283,4 +298,18 @@ ul#reorder-list li {
   font-size: 10px;
   text-align: center;
   padding: 0.25rem;
+}
+
+.watched-date-display {
+    opacity: 0.4;
+    text-align: center;
+    margin-bottom: 20px;
+    font-style: italic;
+    color: #666;
+    font-size: 14px;
+    transition: opacity 0.3s ease;
+}
+
+.watched-date-display:hover {
+    opacity: 0.7;
 }
