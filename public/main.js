@@ -182,11 +182,22 @@ document.addEventListener('DOMContentLoaded', () => {
     const downloadButton = document.getElementById('download-image');
     const posterOptions = document.getElementById('poster-options');
     const backgroundOptions = document.getElementById('background-options');
+    const logoOptions = document.getElementById('logo-options');
+    const logoSelectionSection = document.getElementById('logo-selection-section');
 
     let currentSessionId = null;
     let currentSettings = null;
     let selectedPosterIndex = 0;
     let selectedBackgroundIndex = 0;
+    let selectedLogoIndex = 0; // Add selected logo index variable
+
+    // Poster Style dropdown
+    const posterStyleSelect = document.getElementById('poster-style-select');
+    const blurBackdropCheckbox = document.getElementById('blur-backdrop');
+    const posterOptionsSection = document.querySelector('.menu-section h3'); // "Main Poster:"
+    const posterOptionsDiv = document.getElementById('poster-options');
+    const backgroundOptionsDiv = document.getElementById('background-options');
+    const backgroundSection = document.querySelector('.menu-section:last-child');
 
     // Function to create option items
     function createOptionItem(src, type, index, isActive = false) {
@@ -214,31 +225,84 @@ document.addEventListener('DOMContentLoaded', () => {
           selectedPosterIndex = index;
         } else if (type === 'background') {
           selectedBackgroundIndex = index;
+        } else if (type === 'logo') {
+          selectedLogoIndex = index;
         }
         regenerateWithOption();
       });
       return item;
     }
 
+    // When poster style changes, default blur off for Experimental
+    posterStyleSelect.addEventListener('change', () => {
+      if (posterStyleSelect.value === 'experimental') {
+        blurBackdropCheckbox.checked = false;
+      }
+    });
+
     // Function to populate menu options
     function populateMenuOptions(movieData) {
       // Clear existing options
-      posterOptions.innerHTML = '';
-      backgroundOptions.innerHTML = '';
+      posterOptionsDiv.innerHTML = '';
+      backgroundOptionsDiv.innerHTML = '';
+      logoOptions.innerHTML = '';
       
-      // Add poster options (main poster + alternatives)
-      const posters = [movieData.mainPoster, ...(movieData.alternativePosters || [])];
-      posters.forEach((poster, index) => {
-        const item = createOptionItem(poster, 'poster', index, index === selectedPosterIndex);
-        posterOptions.appendChild(item);
-      });
+      // Hide logo section by default
+      logoSelectionSection.style.display = 'none';
 
-      // Add background options (main backdrop + alternatives)
-      const backgrounds = [movieData.mainBackdrop, ...(movieData.alternativeBackdrops || [])];
-      backgrounds.forEach((background, index) => {
-        const item = createOptionItem(background, 'background', index, index === selectedBackgroundIndex);
-        backgroundOptions.appendChild(item);
-      });
+      // Experimental mode: handle logos and other options
+      if (posterStyleSelect.value === 'experimental') {
+        // Hide poster section
+        posterOptionsSection.parentElement.style.display = 'none';
+
+        // Show logos if available (for experimental mode)
+        if (movieData.alternativeLogos && movieData.alternativeLogos.length > 0) {
+          logoSelectionSection.style.display = ''; // Show the section
+          
+          // Add logo options
+          movieData.alternativeLogos.forEach((logo, index) => {
+            const item = createOptionItem(logo.url, 'logo', index, index === selectedLogoIndex);
+            logoOptions.appendChild(item);
+          });
+        }
+
+        // Combine all backdrops and posters for background selection
+        let backgrounds = [];
+        // Use sorted backdrops from backend (already sorted by quality)
+        if (movieData.alternativeBackdrops && movieData.alternativeBackdrops.length > 0) {
+          backgrounds = backgrounds.concat(movieData.alternativeBackdrops);
+        }
+        // Add all posters as additional backgrounds (avoid duplicates)
+        const posters = [movieData.mainPoster, ...(movieData.alternativePosters || [])].filter(Boolean);
+        posters.forEach(poster => {
+          if (poster && !backgrounds.includes(poster)) backgrounds.push(poster);
+        });
+
+        backgrounds.forEach((background, index) => {
+          const item = createOptionItem(background, 'background', index, index === selectedBackgroundIndex);
+          backgroundOptionsDiv.appendChild(item);
+        });
+
+        // Always show background section
+        backgroundSection.style.display = '';
+      } else {
+        // Classic mode: show poster selection and backgrounds as usual
+        posterOptionsSection.parentElement.style.display = '';
+        // Add poster options (main poster + alternatives)
+        const posters = [movieData.mainPoster, ...(movieData.alternativePosters || [])];
+        posters.forEach((poster, index) => {
+          const item = createOptionItem(poster, 'poster', index, index === selectedPosterIndex);
+          posterOptionsDiv.appendChild(item);
+        });
+
+        // Add background options (main backdrop + alternatives)
+        let backgrounds = [movieData.mainBackdrop, ...(movieData.alternativeBackdrops || [])];
+        backgrounds.forEach((background, index) => {
+          const item = createOptionItem(background, 'background', index, index === selectedBackgroundIndex);
+          backgroundOptionsDiv.appendChild(item);
+        });
+        backgroundSection.style.display = '';
+      }
     }
 
     // Function to regenerate image with selected options
@@ -252,6 +316,7 @@ document.addEventListener('DOMContentLoaded', () => {
           sessionId: currentSessionId,
           selectedPosterIndex,
           selectedBackgroundIndex,
+          selectedLogoIndex, // Add logo index
           settings: currentSettings
         };
 
@@ -270,10 +335,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const url = URL.createObjectURL(blob);
         generatedImage.src = url;
 
-        // Update active states
+        // Update active states for all option types
         document.querySelectorAll('.option-item').forEach(item => item.classList.remove('active'));
         document.querySelectorAll(`[data-type="poster"][data-index="${selectedPosterIndex}"]`).forEach(item => item.classList.add('active'));
         document.querySelectorAll(`[data-type="background"][data-index="${selectedBackgroundIndex}"]`).forEach(item => item.classList.add('active'));
+        document.querySelectorAll(`[data-type="logo"][data-index="${selectedLogoIndex}"]`).forEach(item => item.classList.add('active'));
 
         overlay.classList.remove('show');
 
@@ -378,7 +444,8 @@ document.addEventListener('DOMContentLoaded', () => {
           titleBelowPoster: parseInt(document.getElementById('title-below-poster').value),
           lineHeight: parseInt(document.getElementById('line-height').value),
           betweenSections: parseInt(document.getElementById('between-sections').value),
-        }
+        },
+        posterStyle: posterStyleSelect.value // <-- Add this line
       };
 
       currentSettings = settings;

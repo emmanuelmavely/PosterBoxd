@@ -101,7 +101,265 @@ function formatRuntime(runtime) {
   return `${hours}h ${minutes}min`;
 }
 
-async function generatePosterImage(movieData, settings, selectedPosterIndex = 0, selectedBackgroundIndex = 0) {
+/**
+ * Sort backdrops by quality (resolution, aspect ratio, vote average)
+ */
+function sortBackdropsByQuality(backdrops) {
+  if (!backdrops || !backdrops.length) return [];
+  const scoredBackdrops = backdrops.map(backdrop => {
+    let qualityScore = 0;
+    qualityScore += (backdrop.width * backdrop.height) / 100000;
+    const aspectRatio = backdrop.width / backdrop.height;
+    const aspectDiff = Math.abs(aspectRatio - 1.78);
+    qualityScore -= aspectDiff * 10;
+    if (backdrop.vote_average) qualityScore += backdrop.vote_average * 5;
+    if (backdrop.vote_count) qualityScore += Math.min(backdrop.vote_count / 10, 5);
+    return { ...backdrop, qualityScore };
+  });
+  return scoredBackdrops.sort((a, b) => b.qualityScore - a.qualityScore);
+}
+
+// Group crew by role, combine names, and handle Director/Writer merge
+function groupCrewByRole(credits) {
+  if (!credits || !credits.crew) return [];
+  const roleOrder = [
+    'Director',
+    'Writer',
+    'Producer',
+    'Director of Photography',
+    'Sound'
+  ];
+  const roleMap = {};
+  for (const member of credits.crew) {
+    let job = member.job;
+    if (job === 'Director of Photography (DOP)' || job === 'Cinematography') job = 'Director of Photography';
+    if (job === 'Sound Designer' || job === 'Original Music Composer') job = 'Sound';
+    if (!roleOrder.includes(job)) continue;
+    if (!roleMap[job]) roleMap[job] = [];
+    if (!roleMap[job].includes(member.name)) roleMap[job].push(member.name);
+  }
+  // Combine Director & Writer if same person
+  let combined = [];
+  if (
+    roleMap['Director'] &&
+    roleMap['Writer'] &&
+    roleMap['Director'].length === 1 &&
+    roleMap['Writer'].length === 1 &&
+    roleMap['Director'][0] === roleMap['Writer'][0]
+  ) {
+    combined.push({
+      role: 'Director / Writer',
+      names: [roleMap['Director'][0]]
+    });
+    delete roleMap['Director'];
+    delete roleMap['Writer'];
+  }
+  // Add remaining roles in order, combine all names for each role
+  roleOrder.forEach(role => {
+    if (roleMap[role]) {
+      combined.push({
+        role,
+        names: roleMap[role]
+      });
+    }
+  });
+  return combined;
+}
+
+// Helper for star string
+function getStarString(rating) {
+  if (!rating) return '';
+  const full = Math.floor(rating);
+  const half = rating % 1 >= 0.5;
+  const empty = 5 - full - (half ? 1 : 0);
+  return '★'.repeat(full) + (half ? '½' : '') + '☆'.repeat(empty);
+}
+
+// Experimental poster generator
+async function generateExperimentalPoster(movieData, settings, selectedPosterIndex = 0, selectedBackgroundIndex = 0, selectedLogoIndex = 0) {
+  const { movie, details, credits, images, username, rating } = movieData;
+  const width = 1080, height = 1920;
+
+  // Backdrop: sort by quality, use best as default
+  const sortedBackdrops = sortBackdropsByQuality(images.backdrops || []);
+  // Add all posters as additional backgrounds (avoid duplicates)
+  const posters = [movie.poster_path, ...(images.posters?.slice(0, 5).map(p => p.file_path) || [])].filter(Boolean);
+  let backgrounds = sortedBackdrops.map(b => `https://image.tmdb.org/t/p/w1280${b.file_path}`);
+  posters.forEach(p => {
+    const posterUrl = `https://image.tmdb.org/t/p/w500${p}`;
+    if (!backgrounds.includes(posterUrl)) backgrounds.push(posterUrl);
+  });
+
+  // Use selected background (from combined list)
+  const selectedBackground = backgrounds[selectedBackgroundIndex] || backgrounds[0];
+
+  // Prepare base image
+  let baseImage = selectedBackground
+    ? sharp(await (await fetch(selectedBackground)).arrayBuffer())
+        .resize(width, height, { fit: 'cover' })
+        .modulate({ brightness: settings.backdropBrightness ?? 0.6 })
+    : sharp({ create: { width, height, channels: 3, background: '#000' } });
+  if (settings.blurBackdrop ?? true) baseImage = baseImage.blur(10);
+
+  // Prepare logo for footer
+  const posterboxdLogoPath = path.join(__dirname, 'public/assets/footer-posterboxd.png');
+  const posterboxdLogoBuffer = await fs.readFile(posterboxdLogoPath);
+  const posterboxdLogoDataUrl = `data:image/png;base64,${posterboxdLogoBuffer.toString('base64')}`;
+
+  // SVG layout constants
+  const leftX = 80;
+  let y = 1150;
+  const lineGap = 40;
+  const titleCrewGap = 50; // Increased from 14 to 50 for better spacing
+  const crewStarsGap = 40;
+  const logoW = 600, logoH = 120;
+  const MAX_CREDIT_LINE_CHARS = 60;
+
+  // SVG content
+  let svgContent = '';
+
+  // --- Title logo from TMDB if available ---
+  let logoPlaced = false;
+  if (images && images.logos && images.logos.length > 0) {
+    // Log the available logos for debugging
+    console.log('[PosterBoxd] Available logos:', images.logos.map(l => ({
+      iso: l.iso_639_1,
+      width: l.width,
+      height: l.height,
+      aspect: l.aspect_ratio,
+      path: l.file_path
+    })));
+    
+    // Define logoSizes array - this was missing and causing the error
+    const logoSizes = ['w500', 'original', 'w300'];
+    
+    // Use the selected logo if valid, otherwise default to English or first
+    const logoObj = images.logos[selectedLogoIndex] || 
+                   images.logos.find(l => l.iso_639_1 === 'en') || 
+                   images.logos[0];
+    
+    if (logoObj && logoObj.file_path) {
+      // Try each size until one works
+      for (const size of logoSizes) {
+        try {
+          const logoUrl = `https://image.tmdb.org/t/p/${size}${logoObj.file_path}`;
+          console.log(`[PosterBoxd] Trying logo URL: ${logoUrl}`);
+          
+          const logoResp = await fetch(logoUrl);
+          if (!logoResp.ok) {
+            console.log(`[PosterBoxd] Logo fetch failed with status: ${logoResp.status}`);
+            continue;
+          }
+          
+          const contentType = logoResp.headers.get('content-type');
+          console.log(`[PosterBoxd] Logo content type: ${contentType}`);
+          
+          const arrBuf = await logoResp.arrayBuffer();
+          const logoBuffer = Buffer.from(arrBuf);
+          
+          console.log(`[PosterBoxd] Logo buffer length: ${logoBuffer.length} bytes`);
+          
+          // Minimum reasonable size for an image (1KB)
+          if (logoBuffer.length > 1024) {
+            const logoDataUrl = `data:${contentType || 'image/png'};base64,${logoBuffer.toString('base64')}`;
+            // Change preserveAspectRatio from "xMidYMid meet" to "xMinYMid meet" to left-align the logo
+            svgContent += `<image x="${leftX}" y="${y}" width="${logoW}" height="${logoH}" xlink:href="${logoDataUrl}" preserveAspectRatio="xMinYMid meet" />`;
+            y += logoH + titleCrewGap;
+            logoPlaced = true;
+            console.log(`[PosterBoxd] Logo placed successfully from ${size}`);
+            break;
+          } else {
+            console.log(`[PosterBoxd] Logo too small (${logoBuffer.length} bytes), trying next size`);
+          }
+        } catch (e) {
+          console.error(`[PosterBoxd] Error fetching logo with size ${size}:`, e);
+        }
+      }
+    }
+  }
+  
+  if (!logoPlaced) {
+    console.log('[PosterBoxd] Using fallback text title');
+    const year = movieData.year ? ` <tspan class="title-year">(${escapeXml(movieData.year)})</tspan>` : '';
+    svgContent += `<text x="${leftX}" y="${y}" class="logo-title" text-anchor="start">${escapeXml(movieData.title)}${year}</text>`;
+    y += 80 + titleCrewGap; // Also update spacing for text title fallback
+  }
+
+  // Crew credits (grouped by role, names bold, left-aligned, char limit)
+  const groupedByRole = groupCrewByRole(credits);
+  groupedByRole.forEach(item => {
+    let displayNames = [...item.names];
+    let creditText = `${item.role}: ${displayNames.join(' / ')}`;
+    // Character limit logic
+    while (creditText.length > MAX_CREDIT_LINE_CHARS && displayNames.length > 1) {
+      displayNames.pop();
+      creditText = `${item.role}: ${displayNames.join(' / ')} & others`;
+    }
+    if (creditText.length > MAX_CREDIT_LINE_CHARS && displayNames.length === 1) {
+      const maxNameLength = MAX_CREDIT_LINE_CHARS - `${item.role}: `.length - 3;
+      displayNames[0] = displayNames[0].substring(0, maxNameLength) + "...";
+      creditText = `${item.role}: ${displayNames[0]}`;
+    }
+    const colonIndex = creditText.indexOf(':');
+    const rolePart = creditText.substring(0, colonIndex + 1);
+    const namesPart = creditText.substring(colonIndex + 1);
+    svgContent += `<text x="${leftX}" y="${y}" class="credit-line">${escapeXml(rolePart)}<tspan class="credit-name">${escapeXml(namesPart)}</tspan></text>`;
+    y += lineGap;
+  });
+
+  // Add a smaller gap before the stars
+  y += crewStarsGap;
+
+  // Rating stars (left-aligned, just below crew info)
+  if (rating) {
+    svgContent += `<text x="${leftX}" y="${y}" class="rating-stars" text-anchor="start">${escapeXml(getStarString(rating))}</text>`;
+    y += lineGap;
+  }
+
+  // Centered footer (username, --on--, logo)
+  const footerY = 1720;
+  const footerLogoW = 320;
+  const footerLogoH = 44;
+  svgContent += `
+    <text x="540" y="${footerY}" text-anchor="middle" class="footer-username">${escapeXml(username)}</text>
+    <text x="540" y="${footerY + 24}" text-anchor="middle" class="footer-on">— on —</text>
+    <image x="${(1080 - footerLogoW) / 2}" y="${footerY + 38}" width="${footerLogoW}" height="${footerLogoH}" xlink:href="${posterboxdLogoDataUrl}" class="logo-footer" />
+  `;
+
+  // SVG style (add .title-year for thin Poppins)
+  let svg = `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <style><![CDATA[
+      .logo-title { font-family: 'Poppins', sans-serif; font-size: 80px; font-weight: 700; fill: #fff; }
+      .title-year { font-family: 'Poppins', sans-serif; font-size: 60px; font-weight: 300; fill: #fff; }
+      .credit-line { font-family: 'Poppins', sans-serif; font-size: 28px; font-weight: 400; fill: #fff; text-anchor: start; }
+      .credit-name { font-family: 'Poppins', sans-serif; font-size: 28px; font-weight: 700; fill: #fff; }
+      .rating-stars { font-family: 'Poppins', sans-serif; font-size: 54px; fill: #00d474; letter-spacing: 8px; }
+      .footer-username { fill: #fff; font-size: 30px; font-weight: bold; font-family: 'SF Pro Text', 'Segoe UI', sans-serif; }
+      .footer-on { fill: #aaa; font-size: 20px; font-family: 'SF Pro Text', 'Segoe UI', sans-serif; }
+      .logo-footer { opacity: 0.9; }
+    ]]></style>
+    ${svgContent}
+  </svg>`;
+
+  // Compose layers
+  const layers = [];
+  if (settings.gradientOverlay) {
+    const gradientSvg = `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
+      <defs><linearGradient id="fade" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0%" stop-color="#000" stop-opacity="0.5"/>
+      <stop offset="100%" stop-color="#000" stop-opacity="0"/></linearGradient></defs>
+      <rect width="${width}" height="${height}" fill="url(#fade)"/></svg>`;
+    layers.push({ input: Buffer.from(gradientSvg), top: 0, left: 0 });
+  }
+  layers.push({ input: Buffer.from(svg), top: 0, left: 0 });
+
+  return await baseImage.composite(layers).jpeg({ quality: 90 }).toBuffer();
+}
+
+async function generatePosterImage(movieData, settings, selectedPosterIndex = 0, selectedBackgroundIndex = 0, selectedLogoIndex = 0) {
+  if (settings.posterStyle === 'experimental') {
+    return await generateExperimentalPoster(movieData, settings, selectedPosterIndex, selectedBackgroundIndex, selectedLogoIndex);
+  }
   const { movie, details, credits, images, tags, username, rating, isLiked, watchedDate, isCustomMode } = movieData;
   
   // Get selected poster and backdrop
@@ -431,6 +689,33 @@ app.post('/generate-image', async (req, res) => {
 
     const finalBuffer = await generatePosterImage(movieData, settings);
     
+    // After movieData is set, add logos to the response for the frontend
+    let alternativeLogos = [];
+    if (settings.posterStyle === 'experimental' && movieData.images && movieData.images.logos) {
+      alternativeLogos = movieData.images.logos.map(logo => ({
+        url: `https://image.tmdb.org/t/p/w500${logo.file_path}`,
+        language: logo.iso_639_1,
+        width: logo.width,
+        height: logo.height
+      }));
+    }
+
+    // Fix: Create a properly scoped variable for alternativeBackdrops
+    let alternativeBackdrops = movieData.alternativeBackdrops || [];
+    
+    // For experimental, send all backdrops + posters as backgrounds
+    if (settings.posterStyle === 'experimental' && movieData.images) {
+      const sorted = sortBackdropsByQuality(movieData.images.backdrops || []);
+      let backgrounds = sorted.map(b => `https://image.tmdb.org/t/p/w1280${b.file_path}`);
+      const posters = [movieData.movie.poster_path, ...(movieData.images.posters?.slice(0, 5).map(p => p.file_path) || [])].filter(Boolean);
+      posters.forEach(p => {
+        const posterUrl = `https://image.tmdb.org/t/p/w500${p}`;
+        if (!backgrounds.includes(posterUrl)) backgrounds.push(posterUrl);
+      });
+      alternativeBackdrops = backgrounds;
+      movieData.alternativeBackdrops = backgrounds;
+    }
+
     res.json({
       imageBuffer: finalBuffer,
       sessionId: sessionId,
@@ -438,7 +723,9 @@ app.post('/generate-image', async (req, res) => {
         mainPoster: movieData.mainPoster,
         mainBackdrop: movieData.mainBackdrop,
         alternativePosters: movieData.alternativePosters,
-        alternativeBackdrops: movieData.alternativeBackdrops
+        alternativeBackdrops: alternativeBackdrops,
+        alternativeLogos: alternativeLogos,
+        alternativeBackdropsMeta: movieData.alternativeBackdropsMeta
       }
     });
 
@@ -450,7 +737,7 @@ app.post('/generate-image', async (req, res) => {
 
 app.post('/regenerate-image', async (req, res) => {
   try {
-    const { sessionId, settings, selectedPosterIndex = 0, selectedBackgroundIndex = 0 } = req.body;
+    const { sessionId, settings, selectedPosterIndex = 0, selectedBackgroundIndex = 0, selectedLogoIndex = 0 } = req.body;
     
     // Retrieve movie data from store
     const movieData = movieDataStore.get(sessionId);
@@ -458,7 +745,7 @@ app.post('/regenerate-image', async (req, res) => {
       return res.status(400).json({ error: 'Session expired. Please generate a new image.' });
     }
     
-    const finalBuffer = await generatePosterImage(movieData, settings, selectedPosterIndex, selectedBackgroundIndex);
+    const finalBuffer = await generatePosterImage(movieData, settings, selectedPosterIndex, selectedBackgroundIndex, selectedLogoIndex);
     
     res.setHeader('Content-Type', 'image/jpeg');
     res.send(finalBuffer);
@@ -471,6 +758,10 @@ app.post('/regenerate-image', async (req, res) => {
 
 app.listen(process.env.PORT || 3000, () => console.log('🚀 Server running on port 3000'));
 
+//Server-alive
+app.get('/ping', (req, res) => {
+  res.send('pong');
+});
 //Server-alive
 app.get('/ping', (req, res) => {
   res.send('pong');
