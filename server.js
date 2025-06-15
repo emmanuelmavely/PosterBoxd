@@ -115,11 +115,11 @@ function formatRuntime(runtime) {
 }
 
 async function generatePosterImage(movieData, settings, selectedPosterIndex = 0, selectedBackgroundIndex = 0) {
-  const { movie, details, credits, images, tags, username, rating, isLiked, watchedDate, isCustomMode } = movieData;
+  const { movie, details, credits, images = {}, tags, username, rating, isLiked, watchedDate, isCustomMode } = movieData;
   
   // Get selected poster and backdrop
-  const posters = [movie.poster_path, ...(images.posters?.slice(0, 5).map(p => p.file_path) || [])].filter(Boolean);
-  const backdrops = [movie.backdrop_path, ...(images.backdrops?.slice(0, 5).map(b => b.file_path) || [])].filter(Boolean);
+  const posters = [movie.poster_path, ...((images.posters || []).slice(0, 5).map(p => p.file_path))].filter(Boolean);
+  const backdrops = [movie.backdrop_path, ...((images.backdrops || []).slice(0, 5).map(b => b.file_path))].filter(Boolean);
   
   const selectedPoster = posters[selectedPosterIndex] ? `https://image.tmdb.org/t/p/w500${posters[selectedPosterIndex]}` : null;
   const selectedBackdrop = backdrops[selectedBackgroundIndex] ? `https://image.tmdb.org/t/p/w1280${backdrops[selectedBackgroundIndex]}` : null;
@@ -189,40 +189,61 @@ async function generatePosterImage(movieData, settings, selectedPosterIndex = 0,
   // Handle director for movies or creator for TV shows
   let creatorOrDirector = '';
   let creatorLabel = 'directed by';
-  
-  if (movieData.isCustomMode && movieData.movie.first_air_date) {
-    // TV Show - look for creators
-    const creators = details.created_by?.map(c => c.name) || [];
-    if (creators.length > 0) {
-      creatorOrDirector = creators.join(' & ');
-      creatorLabel = 'created by';
-    }
-  } else {
-    // Movie - look for director - make sure credits exists
-    if (credits && credits.crew) {
-      creatorOrDirector = credits.crew.find(c => c.job === 'Director')?.name || '';
-    }
+  let yearDisplay = year;
+
+// TV Show: use "created by" and year range
+if (movieData.isCustomMode && movieData.movie.first_air_date) {
+  // TV Show - look for creators
+  const creators = details.created_by?.map(c => c.name) || [];
+  if (creators.length > 0) {
+    creatorOrDirector = creators.join(' & ');
+    creatorLabel = 'created by';
   }
+  // Year range
+  if (details.first_air_date && details.last_air_date) {
+    const startYear = details.first_air_date.substring(0, 4);
+    const endYear = details.last_air_date.substring(0, 4);
+    yearDisplay = startYear === endYear ? startYear : `${startYear}–${endYear}`;
+  }
+} else {
+  // Movie - look for director
+  if (credits && credits.crew) {
+    creatorOrDirector = credits.crew.find(c => c.job === 'Director')?.name || '';
+  }
+}
   
   const musicDirector = credits?.crew?.find(c => c.job === 'Original Music Composer')?.name || '';
   const actors = credits?.cast?.slice(0, 3).map(c => c.name) || [];
   const runtime = details.runtime ? formatRuntime(details.runtime) : null;
 
+  // For season/episode info
+let seasonInfo = '';
+if (movieData.isCustomMode && movieData.movie.number_of_seasons) {
+  const seasons = movieData.movie.number_of_seasons;
+  const episodes = movieData.movie.number_of_episodes;
+  const avgRuntime = Array.isArray(details.episode_run_time) && details.episode_run_time.length
+    ? Math.round(details.episode_run_time.reduce((a, b) => a + b, 0) / details.episode_run_time.length)
+    : null;
+  seasonInfo = `${seasons} season${seasons > 1 ? 's' : ''}, ${episodes} episode${episodes > 1 ? 's' : ''}`;
+  if (avgRuntime) seasonInfo += `, avg ${avgRuntime} min/ep`;
+}
+
   for (const key of contentOrder) {
     if (key === 'title' && settings.showTitle) addWrappedLine(title, 'title', 36);
-    else if (key === 'year' && settings.showYear && year) addWrappedLine(year, 'year');
-    else if (key === 'genre' && settings.showGenre && genre.length) addWrappedLine(genre.join(' | '), 'genre');
+    else if (key === 'year' && settings.showYear && yearDisplay) addWrappedLine(yearDisplay, 'year');
+    else if (key === 'genre' && settings.showGenre && genre.length && !(seasonInfo && settings.showRuntime)) addWrappedLine(genre.join(' | '), 'genre');
     else if (key === 'director' && settings.showDirector && creatorOrDirector) {
       svgParts.push(`<text x="${width / 2}" y="${currentY}" text-anchor="middle" class="label">${creatorLabel} <tspan font-weight="bold">${escapeXml(creatorOrDirector)}</tspan></text>`);
       currentY += lineHeight;
-    } else if (key === 'runtime' && settings.showRuntime && runtime) addWrappedLine(runtime, 'label');
-    else if (key === 'music' && settings.showMusic && musicDirector) {
+    } else if (key === 'runtime' && settings.showRuntime && (runtime || seasonInfo)) {
+      addWrappedLine(seasonInfo || runtime, 'label');
+    } else if (key === 'music' && settings.showMusic && musicDirector) {
       svgParts.push(`<text x="${width / 2}" y="${currentY}" text-anchor="middle" class="label">music by <tspan font-weight="bold">${escapeXml(musicDirector)}</tspan></text>`);
       currentY += lineHeight;
     } else if (key === 'actors' && settings.showActors && actors.length) addWrappedLine(actors.join(', '), 'actors', 60);
     else if (key === 'rating' && settings.showRating && (rating || isLiked)) {
       currentY += Math.round(lineHeight / 2);
-      
+
       // Show rating stars if available
       if (rating) {
         const full = Math.floor(rating), half = rating % 1 >= 0.5, empty = 5 - full - (half ? 1 : 0);
@@ -230,13 +251,13 @@ async function generatePosterImage(movieData, settings, selectedPosterIndex = 0,
         svgParts.push(`<text x="${width / 2}" y="${currentY}" text-anchor="middle" class="stars">${stars}</text>`);
         currentY += lineHeight;
       }
-      
-      // Show heart if liked
-      if (isLiked) {
+
+      // Show heart if liked AND showHeart is enabled
+      if (isLiked && settings.showHeart) {
         svgParts.push(`<text x="${width / 2}" y="${currentY}" text-anchor="middle" class="heart">♥</text>`);
         currentY += lineHeight;
       }
-      
+
       currentY += betweenSections - lineHeight;
     } else if (key === 'tags' && settings.showTags && tags.length) {
       wrapText(tags.map(t => `#${t}`).join(' '), 60).forEach(line => {

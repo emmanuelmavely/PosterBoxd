@@ -238,6 +238,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let currentSessionId = null;
     let currentSettings = null;
+    let currentPosterIndex = 0;
+    let currentBackgroundIndex = 0;
 
     // Function to create option items
     function createOptionItem(src, type, index, isActive = false) {
@@ -283,19 +285,26 @@ document.addEventListener('DOMContentLoaded', () => {
         const item = createOptionItem(background, 'background', index, index === 0);
         backgroundOptions.appendChild(item);
       });
+      
+      currentPosterIndex = 0;
+      currentBackgroundIndex = 0;
     }
 
     // Function to regenerate image with selected option
     async function regenerateWithOption(type, index) {
       if (!currentSessionId || !currentSettings) return;
-      
+
       overlay.classList.add('show');
-      
+
+      // Track both indices
+      if (type === 'poster') currentPosterIndex = index;
+      if (type === 'background') currentBackgroundIndex = index;
+
       try {
         const requestData = {
           sessionId: currentSessionId,
-          selectedPosterIndex: type === 'poster' ? index : 0,
-          selectedBackgroundIndex: type === 'background' ? index : 0,
+          selectedPosterIndex: currentPosterIndex,
+          selectedBackgroundIndex: currentBackgroundIndex,
           settings: currentSettings
         };
         
@@ -379,13 +388,11 @@ document.addEventListener('DOMContentLoaded', () => {
           const customRating = document.getElementById('custom-rating').value;
           const customUsername = document.getElementById('custom-username').value;
           const customWatchedDate = document.getElementById('custom-watched-date').value;
-          const customIsLiked = document.getElementById('custom-liked').checked;
           const customTags = document.getElementById('custom-tags').value;
           
           if (customRating) formData.append('rating', customRating);
           if (customUsername) formData.append('username', customUsername);
           if (customWatchedDate) formData.append('watchedDate', customWatchedDate);
-          if (customIsLiked) formData.append('isLiked', 'true');
           if (customTags) formData.append('tags', customTags);
         }
         
@@ -417,7 +424,8 @@ document.addEventListener('DOMContentLoaded', () => {
           result.style.display = 'block';
           currentSessionId = data.sessionId;
           currentSettings = settingsData;
-          
+          currentPosterIndex = 0; // Reset on new image
+          currentBackgroundIndex = 0; // Reset on new image
           if (data.movieData) {
             populateMenuOptions(data.movieData);
           }
