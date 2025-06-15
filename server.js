@@ -26,6 +26,30 @@ const movieDataStore = new Map();
 
 const TMDB_API_KEY = process.env.TMDB_API_KEY;
 
+// Search endpoint
+app.post('/search-media', async (req, res) => {
+  try {
+    const { query } = req.body;
+    
+    // Search both movies and TV shows
+    const [movieResults, tvResults] = await Promise.all([
+      fetch(`https://api.themoviedb.org/3/search/movie?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(query)}`).then(r => r.json()),
+      fetch(`https://api.themoviedb.org/3/search/tv?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(query)}`).then(r => r.json())
+    ]);
+    
+    // Combine and sort by popularity
+    const allResults = [
+      ...(movieResults.results || []).map(item => ({ ...item, media_type: 'movie' })),
+      ...(tvResults.results || []).map(item => ({ ...item, media_type: 'tv' }))
+    ].sort((a, b) => b.popularity - a.popularity).slice(0, 10);
+    
+    res.json({ results: allResults });
+  } catch (error) {
+    console.error('Search error:', error);
+    res.status(500).json({ error: 'Search failed' });
+  }
+});
+
 function escapeXml(unsafe) {
   return unsafe.replace(/[<>&'\"]+/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&apos;' }[c]));
 }
@@ -78,7 +102,7 @@ function formatRuntime(runtime) {
 }
 
 async function generatePosterImage(movieData, settings, selectedPosterIndex = 0, selectedBackgroundIndex = 0) {
-  const { movie, details, credits, images, tags, username, rating, isLiked, watchedDate } = movieData;
+  const { movie, details, credits, images, tags, username, rating, isLiked, watchedDate, isCustomMode } = movieData;
   
   // Get selected poster and backdrop
   const posters = [movie.poster_path, ...(images.posters?.slice(0, 5).map(p => p.file_path) || [])].filter(Boolean);
@@ -114,9 +138,23 @@ async function generatePosterImage(movieData, settings, selectedPosterIndex = 0,
     ? await sharp(await (await fetch(selectedPoster)).arrayBuffer()).resize(posterWidth, posterHeight).toBuffer()
     : null;
 
-  const logoPath = path.join(__dirname, 'public/assets/letterboxd-logo.png');
-  const logoBuffer = await fs.readFile(logoPath);
+  // Choose the appropriate logo based on mode
+  const logoPath = isCustomMode 
+    ? path.join(__dirname, 'public/assets/footer-posterboxd.png')
+    : path.join(__dirname, 'public/assets/letterboxd-logo.png');
+    
+  let logoBuffer;
+  try {
+    logoBuffer = await fs.readFile(logoPath);
+  } catch (error) {
+    // Fallback to letterboxd logo if custom logo doesn't exist
+    logoBuffer = await fs.readFile(path.join(__dirname, 'public/assets/letterboxd-logo.png'));
+  }
+  
   const logoDataUrl = `data:image/png;base64,${logoBuffer.toString('base64')}`;
+
+  // Adjust footer scale for custom mode
+  const defaultFooterScale = isCustomMode ? 1.9 : settings.footerScale ?? 1.0;
 
   const svgParts = [];
   let currentY = posterY + posterHeight + titleOffset;
@@ -180,8 +218,8 @@ async function generatePosterImage(movieData, settings, selectedPosterIndex = 0,
 
   // Footer with watched date
   const footerY = height - (watchedDate ? 160 : 130); // Adjust footer position if watched date exists
-  const logoW = Math.round(160 * footerScale);
-  const logoH = Math.round(22 * footerScale);
+  const logoW = Math.round(160 * defaultFooterScale);
+  const logoH = Math.round(22 * defaultFooterScale);
   
   svgParts.push(
     `<text x="${width / 2}" y="${footerY}" text-anchor="middle" class="footer-username">${escapeXml(username)}</text>`,
@@ -238,60 +276,120 @@ async function generatePosterImage(movieData, settings, selectedPosterIndex = 0,
 
 app.post('/generate-image', async (req, res) => {
   try {
-    const { letterboxdUrl, settings = {} } = req.body;
-    const response = await fetch(letterboxdUrl);
-    const html = await response.text();
-    const $ = cheerio.load(html);
+    const { mode, settings = {} } = req.body;
+    let movieData;
 
-    const title = $('.film-title-wrapper a').first().text().trim();
-    const year = $('.film-title-wrapper .metadata a').first().text().trim();
-    const directorText = $('a[href*="/director/"]').first().text().trim();
-    const username = $('.person-summary .name span').first().text().trim();
-    const tags = $('ul.tags li a').map((_, el) => $(el).text().trim()).get();
-    const rating = ($('.rating-large').attr('class')?.match(/rated-large-(\d+)/)?.[1] || 0) / 2;
-    
-    // Check if the review is liked (heart present)
-    const isLiked = $('.icon-liked').length > 0;
+    if (mode === 'letterboxd') {
+      // Letterboxd mode
+      const { letterboxdUrl } = req.body;
+      const response = await fetch(letterboxdUrl);
+      const html = await response.text();
+      const $ = cheerio.load(html);
 
-    // Extract watched date
-    let watchedDate = null;
-    const viewDateElement = $('.view-date.date-links');
-    if (viewDateElement.length) {
-      const dateLinks = viewDateElement.find('a');
-      if (dateLinks.length >= 3) {
-        const day = $(dateLinks[0]).text().trim();
-        const month = $(dateLinks[1]).text().trim();
-        const year = $(dateLinks[2]).text().trim();
-        watchedDate = `${day} ${month} ${year}`;
+      const title = $('.film-title-wrapper a').first().text().trim();
+      const year = $('.film-title-wrapper .metadata a').first().text().trim();
+      const directorText = $('a[href*="/director/"]').first().text().trim();
+      const username = $('.person-summary .name span').first().text().trim();
+      const tags = $('ul.tags li a').map((_, el) => $(el).text().trim()).get();
+      const rating = ($('.rating-large').attr('class')?.match(/rated-large-(\d+)/)?.[1] || 0) / 2;
+      
+      // Check if the review is liked (heart present)
+      const isLiked = $('.icon-liked').length > 0;
+
+      // Extract watched date
+      let watchedDate = null;
+      const viewDateElement = $('.view-date.date-links');
+      if (viewDateElement.length) {
+        const dateLinks = viewDateElement.find('a');
+        if (dateLinks.length >= 3) {
+          const day = $(dateLinks[0]).text().trim();
+          const month = $(dateLinks[1]).text().trim();
+          const year = $(dateLinks[2]).text().trim();
+          watchedDate = `${day} ${month} ${year}`;
+        }
+      }
+
+      console.log('🎬 Title:', title);
+      console.log('📅 Year:', year);
+      console.log('🎞️ Director:', directorText);
+      console.log('👤 Username:', username);
+      console.log('📅 Watched on:', watchedDate);
+      console.log('❤️ Liked:', isLiked);
+
+      const { movie, details, credits, images } = await fetchTmdbData(title, year, directorText);
+
+      movieData = {
+        title,
+        year,
+        username,
+        tags,
+        rating,
+        isLiked,
+        watchedDate,
+        movie,
+        details,
+        credits,
+        images,
+        isCustomMode: false,
+        mainPoster: movie.poster_path ? `https://image.tmdb.org/t/p/w500${movie.poster_path}` : null,
+        mainBackdrop: movie.backdrop_path ? `https://image.tmdb.org/t/p/w1280${movie.backdrop_path}` : null,
+        alternativePosters: images.posters?.slice(0, 5).map(p => `https://image.tmdb.org/t/p/w500${p.file_path}`) || [],
+        alternativeBackdrops: images.backdrops?.slice(0, 5).map(b => `https://image.tmdb.org/t/p/w1280${b.file_path}`) || []
+      };
+      
+    } else {
+      // Custom mode
+      const { mediaId, mediaType, rating, tags, username, watchedDate } = req.body;
+      
+      let mediaData;
+      if (mediaType === 'tv') {
+        mediaData = await fetch(`https://api.themoviedb.org/3/tv/${mediaId}?api_key=${TMDB_API_KEY}`).then(res => res.json());
+        const credits = await fetch(`https://api.themoviedb.org/3/tv/${mediaId}/credits?api_key=${TMDB_API_KEY}`).then(res => res.json());
+        const images = await fetch(`https://api.themoviedb.org/3/tv/${mediaId}/images?api_key=${TMDB_API_KEY}`).then(res => res.json());
+        
+        movieData = {
+          title: mediaData.name,
+          year: mediaData.first_air_date ? mediaData.first_air_date.substring(0, 4) : '',
+          username,
+          tags,
+          rating,
+          isLiked: false,
+          watchedDate: watchedDate || null,
+          movie: mediaData,
+          details: mediaData,
+          credits,
+          images,
+          isCustomMode: true,
+          mainPoster: mediaData.poster_path ? `https://image.tmdb.org/t/p/w500${mediaData.poster_path}` : null,
+          mainBackdrop: mediaData.backdrop_path ? `https://image.tmdb.org/t/p/w1280${mediaData.backdrop_path}` : null,
+          alternativePosters: images.posters?.slice(0, 5).map(p => `https://image.tmdb.org/t/p/w500${p.file_path}`) || [],
+          alternativeBackdrops: images.backdrops?.slice(0, 5).map(b => `https://image.tmdb.org/t/p/w1280${b.file_path}`) || []
+        };
+      } else {
+        const movie = await fetch(`https://api.themoviedb.org/3/movie/${mediaId}?api_key=${TMDB_API_KEY}`).then(res => res.json());
+        const credits = await fetch(`https://api.themoviedb.org/3/movie/${mediaId}/credits?api_key=${TMDB_API_KEY}`).then(res => res.json());
+        const images = await fetch(`https://api.themoviedb.org/3/movie/${mediaId}/images?api_key=${TMDB_API_KEY}`).then(res => res.json());
+        
+        movieData = {
+          title: movie.title,
+          year: movie.release_date ? movie.release_date.substring(0, 4) : '',
+          username,
+          tags,
+          rating,
+          isLiked: false,
+          watchedDate: watchedDate || null,
+          movie,
+          details: movie,
+          credits,
+          images,
+          isCustomMode: true,
+          mainPoster: movie.poster_path ? `https://image.tmdb.org/t/p/w500${movie.poster_path}` : null,
+          mainBackdrop: movie.backdrop_path ? `https://image.tmdb.org/t/p/w1280${movie.backdrop_path}` : null,
+          alternativePosters: images.posters?.slice(0, 5).map(p => `https://image.tmdb.org/t/p/w500${p.file_path}`) || [],
+          alternativeBackdrops: images.backdrops?.slice(0, 5).map(b => `https://image.tmdb.org/t/p/w1280${b.file_path}`) || []
+        };
       }
     }
-
-    console.log('🎬 Title:', title);
-    console.log('📅 Year:', year);
-    console.log('🎞️ Director:', directorText);
-    console.log('👤 Username:', username);
-    console.log('📅 Watched on:', watchedDate);
-    console.log('❤️ Liked:', isLiked);
-
-    const { movie, details, credits, images } = await fetchTmdbData(title, year, directorText);
-
-    const movieData = {
-      title,
-      year,
-      username,
-      tags,
-      rating,
-      isLiked,
-      watchedDate, // Add watched date to movie data
-      movie,
-      details,
-      credits,
-      images,
-      mainPoster: movie.poster_path ? `https://image.tmdb.org/t/p/w500${movie.poster_path}` : null,
-      mainBackdrop: movie.backdrop_path ? `https://image.tmdb.org/t/p/w1280${movie.backdrop_path}` : null,
-      alternativePosters: images.posters?.slice(0, 5).map(p => `https://image.tmdb.org/t/p/w500${p.file_path}`) || [],
-      alternativeBackdrops: images.backdrops?.slice(0, 5).map(b => `https://image.tmdb.org/t/p/w1280${b.file_path}`) || []
-    };
 
     // Generate a unique session ID and store the movie data
     const sessionId = Date.now().toString(36) + Math.random().toString(36).substr(2);

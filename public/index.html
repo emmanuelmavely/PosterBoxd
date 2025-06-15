@@ -37,54 +37,107 @@
     </div>
 
     <form id="image-form">
-      <div class="card">
+      <!-- Mode Selection Pills -->
+      <div class="mode-selector">
+        <button type="button" class="mode-pill active" data-mode="letterboxd">
+          <i class="fa-brands fa-letterboxd"></i> Letterboxd
+        </button>
+        <button type="button" class="mode-pill" data-mode="custom">
+          <i class="fas fa-film"></i> Custom
+        </button>
+      </div>
+
+      <!-- Letterboxd Mode -->
+      <div class="card" id="letterboxd-mode">
         <label for="letterboxd-url">Letterboxd Share Text:</label>
-        <input type="text" id="letterboxd-url" placeholder="Paste the share text here..." required />
+        <input type="text" id="letterboxd-url" placeholder="Paste the share text here..." />
         <button type="submit">Generate Image</button>
+      </div>
+
+      <!-- Custom Mode -->
+      <div class="card" id="custom-mode" style="display: none;">
+        <label for="custom-title">Title:</label>
+        <input type="text" id="custom-title" placeholder="Enter movie or TV series title..." />
+        <button type="button" id="search-button">Search</button>
+        
+        <div id="search-results" class="search-results" style="display: none;"></div>
+        
+        <div id="custom-fields" style="display: none;">
+          <label for="custom-rating">Rating:</label>
+          <div class="rating-container">
+            <input type="range" id="custom-rating" class="rating-slider" min="0" max="10" step="0.5" value="0">
+            <div class="rating-stars">
+              <span class="stars-display">☆☆☆☆☆</span>
+            </div>
+          </div>
+          
+          <label for="custom-tags">Hashtags:</label>
+          <input type="text" id="custom-tags" placeholder="Enter hashtags separated by commas..." />
+          
+          <label for="custom-username">Username:</label>
+          <input type="text" id="custom-username" placeholder="Enter your username..." />
+          
+          <label for="custom-watched-date">Watched Date (optional):</label>
+          <input type="date" id="custom-watched-date" />
+          
+          <button type="submit">Generate Image</button>
+        </div>
       </div>
 
       <details class="card details" id="settings-panel">
         <summary>⚙️ Advanced Settings</summary>
 
-        <h2>🛠️ Customize Metadata Order</h2>
-        <ul id="reorder-list">
-          <li data-id="title"><span class="drag-handle">☰</span><input type="checkbox" id="show-title" checked> Title</li>
-          <li data-id="year"><span class="drag-handle">☰</span><input type="checkbox" id="show-year" checked> Year</li>
-          <li data-id="director"><span class="drag-handle">☰</span><input type="checkbox" id="show-director" checked> Director</li>
-          <li data-id="music"><span class="drag-handle">☰</span><input type="checkbox" id="show-music"> Music</li>
-          <li data-id="actors"><span class="drag-handle">☰</span><input type="checkbox" id="show-actors" checked> Actors</li>
-          <li data-id="genre"><span class="drag-handle">☰</span><input type="checkbox" id="show-genre" checked> Genre</li>
-          <li data-id="runtime"><span class="drag-handle">☰</span><input type="checkbox" id="show-runtime"> Run Time</li>
-          <li data-id="rating"><span class="drag-handle">☰</span><input type="checkbox" id="show-rating" checked> Rating</li>
-          <li data-id="heart" class="non-reorderable"><span class="drag-handle disabled">❤️</span><input type="checkbox" id="show-heart"> Heart (if liked)</li>
-          <li data-id="tags"><span class="drag-handle">☰</span><input type="checkbox" id="show-tags" checked> Tags</li>
-          <li data-id="watched-date" class="non-reorderable"><span class="drag-handle disabled">📅</span><input type="checkbox" id="show-watched-date" checked> Watched Date</li>
-        </ul>
+        <!-- Tab Navigation -->
+        <div class="settings-tabs">
+          <button type="button" class="tab-button active" data-tab="metadata">Metadata</button>
+          <button type="button" class="tab-button" data-tab="visual">Visual</button>
+        </div>
 
-        <h2>🎨 Visual Settings</h2>
-        <label><input type="checkbox" id="blur-backdrop" checked> Blur Backdrop</label>
-        <label><input type="checkbox" id="gradient-toggle" checked> Black Gradient Overlay</label>
+        <!-- Metadata Tab -->
+        <div class="tab-content active" id="metadata-tab">
+          <h2>🛠️ Customize Metadata Order</h2>
+          <ul id="reorder-list">
+            <li data-id="title"><span class="drag-handle">☰</span><input type="checkbox" id="show-title" checked> Title</li>
+            <li data-id="year"><span class="drag-handle">☰</span><input type="checkbox" id="show-year" checked> Year</li>
+            <li data-id="director"><span class="drag-handle">☰</span><input type="checkbox" id="show-director" checked> Director</li>
+            <li data-id="music"><span class="drag-handle">☰</span><input type="checkbox" id="show-music"> Music</li>
+            <li data-id="actors"><span class="drag-handle">☰</span><input type="checkbox" id="show-actors" checked> Actors</li>
+            <li data-id="genre"><span class="drag-handle">☰</span><input type="checkbox" id="show-genre" checked> Genre</li>
+            <li data-id="runtime"><span class="drag-handle">☰</span><input type="checkbox" id="show-runtime"> Run Time</li>
+            <li data-id="rating"><span class="drag-handle">☰</span><input type="checkbox" id="show-rating" checked> Rating</li>
+            <li data-id="heart" class="non-reorderable"><span class="drag-handle disabled">❤️</span><input type="checkbox" id="show-heart"> Heart (if liked)</li>
+            <li data-id="tags"><span class="drag-handle">☰</span><input type="checkbox" id="show-tags" checked> Tags</li>
+            <li data-id="watched-date" class="non-reorderable"><span class="drag-handle disabled">📅</span><input type="checkbox" id="show-watched-date" checked> Watched Date</li>
+          </ul>
+        </div>
 
-        <label>Backdrop Brightness: <span id="backdrop-brightness-value">60</span>%</label>
-        <input type="range" id="backdrop-brightness" min="0" max="100" value="60">
+        <!-- Visual Tab -->
+        <div class="tab-content" id="visual-tab">
+          <h2>🎨 Visual Settings</h2>
+          <label><input type="checkbox" id="blur-backdrop" checked> Blur Backdrop</label>
+          <label><input type="checkbox" id="gradient-toggle" checked> Black Gradient Overlay</label>
 
-        <label>Poster Scale: <span id="poster-scale-value">1.0</span>x</label>
-        <input type="range" id="poster-scale" min="0.5" max="2.0" step="0.1" value="1.0">
+          <label>Backdrop Brightness: <span id="backdrop-brightness-value">60</span>%</label>
+          <input type="range" id="backdrop-brightness" min="0" max="100" value="60">
 
-        <label>Footer Scale: <span id="footer-scale-value">1.0</span>x</label>
-        <input type="range" id="footer-scale" min="0.5" max="2.0" step="0.1" value="1.0">
+          <label>Poster Scale: <span id="poster-scale-value">1.0</span>x</label>
+          <input type="range" id="poster-scale" min="0.5" max="2.0" step="0.1" value="1.0">
 
-        <label>Poster Top Margin: <span id="poster-top-value">240</span>px</label>
-        <input type="range" id="poster-top" min="50" max="400" value="240">
+          <label>Footer Scale: <span id="footer-scale-value">1.0</span>x</label>
+          <input type="range" id="footer-scale" min="0.5" max="2.0" step="0.1" value="1.0">
 
-        <label>Title Below Poster: <span id="title-below-poster-value">60</span>px</label>
-        <input type="range" id="title-below-poster" min="10" max="200" value="60">
+          <label>Poster Top Margin: <span id="poster-top-value">240</span>px</label>
+          <input type="range" id="poster-top" min="50" max="400" value="240">
 
-        <label>Line Height: <span id="line-height-value">72</span>px</label>
-        <input type="range" id="line-height" min="20" max="120" value="72">
+          <label>Title Below Poster: <span id="title-below-poster-value">60</span>px</label>
+          <input type="range" id="title-below-poster" min="10" max="200" value="60">
 
-        <label>Between Sections: <span id="between-sections-value">60</span>px</label>
-        <input type="range" id="between-sections" min="10" max="150" value="60">
+          <label>Line Height: <span id="line-height-value">72</span>px</label>
+          <input type="range" id="line-height" min="20" max="120" value="72">
+
+          <label>Between Sections: <span id="between-sections-value">60</span>px</label>
+          <input type="range" id="between-sections" min="10" max="150" value="60">
+        </div>
       </details>
 
       <div id="progress" class="progress" style="display:none"></div>
