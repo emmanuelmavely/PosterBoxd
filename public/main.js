@@ -35,91 +35,22 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     });
 
-    // Interactive star rating system
-    const interactiveStars = document.getElementById('interactive-stars');
-    const ratingDisplay = document.getElementById('rating-display');
-    const hiddenRatingInput = document.getElementById('custom-rating');
-    const stars = interactiveStars.querySelectorAll('.star');
+    // Rating slider
+    const ratingSlider = document.getElementById('custom-rating');
+    const starsDisplay = document.querySelector('.stars-display');
     
-    let currentRating = 0;
-    let isHovering = false;
-
-    function updateStarDisplay(rating, isHover = false) {
-      stars.forEach((star, index) => {
-        const starValue = index + 1;
-        star.classList.remove('filled', 'half');
-        
-        if (rating >= starValue) {
-          star.classList.add('filled');
-        } else if (rating >= starValue - 0.5) {
-          star.classList.add('half');
-        }
-      });
+    function updateStarsDisplay(value) {
+      const rating = parseFloat(value);
+      const full = Math.floor(rating / 2);
+      const half = (rating % 2) >= 1;
+      const empty = 5 - full - (half ? 1 : 0);
       
-      if (isHover) {
-        ratingDisplay.textContent = `${rating}/5`;
-      } else {
-        ratingDisplay.textContent = currentRating > 0 ? `${currentRating}/5` : '0/5';
-      }
+      starsDisplay.textContent = '★'.repeat(full) + (half ? '½' : '') + '☆'.repeat(empty);
     }
-
-    // Handle star clicks
-    stars.forEach((star, index) => {
-      star.addEventListener('click', (e) => {
-        const rect = star.getBoundingClientRect();
-        const clickX = e.clientX - rect.left;
-        const starWidth = rect.width;
-        
-        // Determine if click is on left half (half star) or right half (full star)
-        const isHalfClick = clickX < starWidth / 2;
-        const newRating = index + (isHalfClick ? 0.5 : 1);
-        
-        // Toggle behavior: if clicking the same rating, set to 0
-        if (currentRating === newRating) {
-          currentRating = 0;
-        } else {
-          currentRating = newRating;
-        }
-        
-        hiddenRatingInput.value = currentRating * 2; // Convert to 10-point scale for backend
-        updateStarDisplay(currentRating);
-      });
-
-      // Handle hover effects
-      star.addEventListener('mouseenter', (e) => {
-        isHovering = true;
-        const rect = star.getBoundingClientRect();
-        const mouseX = e.clientX - rect.left;
-        const starWidth = rect.width;
-        
-        const isHalfHover = mouseX < starWidth / 2;
-        const hoverRating = index + (isHalfHover ? 0.5 : 1);
-        
-        updateStarDisplay(hoverRating, true);
-      });
-
-      star.addEventListener('mousemove', (e) => {
-        if (!isHovering) return;
-        
-        const rect = star.getBoundingClientRect();
-        const mouseX = e.clientX - rect.left;
-        const starWidth = rect.width;
-        
-        const isHalfHover = mouseX < starWidth / 2;
-        const hoverRating = index + (isHalfHover ? 0.5 : 1);
-        
-        updateStarDisplay(hoverRating, true);
-      });
+    
+    ratingSlider.addEventListener('input', (e) => {
+      updateStarsDisplay(e.target.value);
     });
-
-    // Handle mouse leave
-    interactiveStars.addEventListener('mouseleave', () => {
-      isHovering = false;
-      updateStarDisplay(currentRating);
-    });
-
-    // Initialize display
-    updateStarDisplay(0);
 
     // Search functionality
     const searchButton = document.getElementById('search-button');
@@ -150,7 +81,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     function displaySearchResults(results) {
       if (!results || results.length === 0) {
-        searchResults.innerHTML = '<div style="padding: 1rem; text-align: center; color: #8e8e93;">No results found</div>';
+        searchResults.innerHTML = '<div style="padding: 1rem; text-align: center;">No results found</div>';
         return;
       }
       
@@ -164,7 +95,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <div class="search-result-title">
               ${item.title || item.name}
               <span class="search-result-year">${item.release_date || item.first_air_date ? `(${(item.release_date || item.first_air_date).substring(0, 4)})` : ''}</span>
-              <span class="search-result-type ${item.media_type === 'tv' ? 'tv' : ''}">${item.media_type === 'tv' ? 'TV' : 'Movie'}</span>
+              <span class="search-result-type">${item.media_type === 'tv' ? 'TV' : 'Movie'}</span>
             </div>
             <div class="search-result-cast">${item.overview ? item.overview.substring(0, 100) + '...' : ''}</div>
           </div>
@@ -174,32 +105,20 @@ document.addEventListener('DOMContentLoaded', () => {
       // Add click handlers to search results
       document.querySelectorAll('.search-result-item').forEach(item => {
         item.addEventListener('click', () => {
-          const id = item.dataset.id;
-          const type = item.dataset.type;
-          selectSearchResult(id, type);
+          const selectedId = item.dataset.id;
+          const selectedType = item.dataset.type;
+          
+          // Store selected media data
+          window.selectedMedia = {
+            id: selectedId,
+            type: selectedType
+          };
+          
+          // Hide search results and show custom fields
+          searchResults.style.display = 'none';
+          customFields.style.display = 'block';
         });
       });
-    }
-
-    // Add the missing selectSearchResult function
-    function selectSearchResult(id, type) {
-      // Hide search results
-      searchResults.style.display = 'none';
-      
-      // Show custom fields
-      customFields.style.display = 'block';
-      
-      // Store the selected media info
-      const selectedMedia = {
-        id: id,
-        type: type
-      };
-      
-      // Store in a data attribute or global variable for form submission
-      customFields.dataset.selectedId = id;
-      customFields.dataset.selectedType = type;
-      
-      console.log('Selected:', selectedMedia);
     }
 
     // Live update slider labels
@@ -343,91 +262,129 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.getElementById('image-form').addEventListener('submit', async (e) => {
       e.preventDefault();
-      
       overlay.classList.add('show');
       result.style.display = 'none';
+
+      // Check which mode is active
+      const activeMode = document.querySelector('.mode-pill.active').dataset.mode;
       
+      let requestData;
+      
+      if (activeMode === 'letterboxd') {
+        // Extract URL from the share text
+        const shareText = document.getElementById('letterboxd-url').value.trim();
+        const urlMatch = shareText.match(/(https:\/\/(?:boxd\.it|letterboxd\.com)\/[^\s]+)/);
+        if (!urlMatch) {
+          alert('Please provide a valid Letterboxd URL.');
+          overlay.classList.remove('show');
+          return;
+        }
+        const letterboxdUrl = urlMatch[1];
+        
+        requestData = {
+          mode: 'letterboxd',
+          letterboxdUrl: letterboxdUrl
+        };
+      } else {
+        // Custom mode
+        if (!window.selectedMedia) {
+          alert('Please search and select a movie or TV series first.');
+          overlay.classList.remove('show');
+          return;
+        }
+        
+        const customRating = parseFloat(document.getElementById('custom-rating').value) / 2; // Convert to 5-star scale
+        const customTags = document.getElementById('custom-tags').value.split(',').map(tag => tag.trim()).filter(tag => tag);
+        const customUsername = document.getElementById('custom-username').value.trim() || 'Anonymous';
+        
+        // Format watched date if provided
+        let watchedDate = null;
+        const dateInput = document.getElementById('custom-watched-date').value;
+        if (dateInput) {
+          const date = new Date(dateInput);
+          const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+          watchedDate = `${date.getDate()} ${months[date.getMonth()]} ${date.getFullYear()}`;
+        }
+        
+        requestData = {
+          mode: 'custom',
+          mediaId: window.selectedMedia.id,
+          mediaType: window.selectedMedia.type,
+          rating: customRating,
+          tags: customTags,
+          username: customUsername,
+          watchedDate: watchedDate
+        };
+      }
+
+      // Gather settings fresh on submit
+      const order = Array.from(document.querySelectorAll('#reorder-list li:not(.non-reorderable)')).map(li => li.dataset.id);
+      const settings = {
+        contentOrder: order,
+        showTitle: document.getElementById('show-title').checked,
+        showYear: document.getElementById('show-year').checked,
+        showGenre: document.getElementById('show-genre').checked,
+        showDirector: document.getElementById('show-director').checked,
+        showMusic: document.getElementById('show-music').checked,
+        showActors: document.getElementById('show-actors').checked,
+        showRating: document.getElementById('show-rating').checked,
+        showHeart: document.getElementById('show-heart').checked,
+        showTags: document.getElementById('show-tags').checked,
+        showRuntime: document.getElementById('show-runtime').checked,
+        showWatchedDate: document.getElementById('show-watched-date').checked,
+        blurBackdrop: document.getElementById('blur-backdrop').checked,
+        gradientOverlay: document.getElementById('gradient-toggle').checked,
+        backdropBrightness: parseFloat(document.getElementById('backdrop-brightness').value) / 100,
+        posterScale: parseFloat(document.getElementById('poster-scale').value),
+        footerScale: parseFloat(document.getElementById('footer-scale').value),
+        spacing: {
+          posterTop: parseInt(document.getElementById('poster-top').value),
+          titleBelowPoster: parseInt(document.getElementById('title-below-poster').value),
+          lineHeight: parseInt(document.getElementById('line-height').value),
+          betweenSections: parseInt(document.getElementById('between-sections').value),
+        }
+      };
+
+      currentSettings = settings;
+
       try {
-        const currentMode = document.querySelector('.mode-pill.active').dataset.mode;
-        let formData;
-        
-        if (currentMode === 'letterboxd') {
-          const letterboxdUrl = document.getElementById('letterboxd-url').value;
-          if (!letterboxdUrl.trim()) {
-            alert('Please enter Letterboxd share text');
-            return;
-          }
-          
-          formData = new FormData();
-          formData.append('letterboxdUrl', letterboxdUrl);
-        } else {
-          // Custom mode
-          const selectedId = customFields.dataset.selectedId;
-          const selectedType = customFields.dataset.selectedType;
-          
-          if (!selectedId) {
-            alert('Please search and select a movie or TV series first');
-            return;
-          }
-          
-          formData = new FormData();
-          formData.append('customMode', 'true');
-          formData.append('mediaId', selectedId);
-          formData.append('mediaType', selectedType);
-          
-          // Add custom fields
-          const customRating = document.getElementById('custom-rating').value;
-          const customUsername = document.getElementById('custom-username').value;
-          const customWatchedDate = document.getElementById('custom-watched-date').value;
-          const customIsLiked = document.getElementById('custom-liked').checked;
-          const customTags = document.getElementById('custom-tags').value;
-          
-          if (customRating) formData.append('rating', customRating);
-          if (customUsername) formData.append('username', customUsername);
-          if (customWatchedDate) formData.append('watchedDate', customWatchedDate);
-          if (customIsLiked) formData.append('isLiked', 'true');
-          if (customTags) formData.append('tags', customTags);
-        }
-        
-        // Add settings
-        const settingsData = {};
-        document.querySelectorAll('#settings-panel input').forEach(input => {
-          if (input.type === 'checkbox') {
-            settingsData[input.id] = input.checked;
-          } else {
-            settingsData[input.id] = input.value;
-          }
-        });
-        
-        formData.append('settings', JSON.stringify(settingsData));
-        
-        const response = await fetch('/generate-image', {
+        const res = await fetch('/generate-image', {
           method: 'POST',
-          body: formData
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ...requestData,
+            settings
+          })
         });
+
+        if (!res.ok) throw new Error('Failed to generate image');
+
+        const responseData = await res.json();
+        const blob = new Blob([new Uint8Array(responseData.imageBuffer.data)], { type: 'image/jpeg' });
+        const url = URL.createObjectURL(blob);
         
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
+        generatedImage.src = url;
+        result.style.display = 'block';
+        overlay.classList.remove('show');
         
-        const data = await response.json();
-        
-        if (data.success) {
-          generatedImage.src = data.imageUrl;
-          result.style.display = 'block';
-          currentSessionId = data.sessionId;
-          currentSettings = settingsData;
-          
-          if (data.movieData) {
-            populateMenuOptions(data.movieData);
-          }
-        } else {
-          alert('Error: ' + data.error);
-        }
-      } catch (error) {
-        console.error('Error:', error);
-        alert('An error occurred while generating the image.');
-      } finally {
+        // Store session ID and populate menu
+        currentSessionId = responseData.sessionId;
+        populateMenuOptions(responseData.movieData);
+
+        copyButton.onclick = async () => {
+          await navigator.clipboard.write([new ClipboardItem({ 'image/jpeg': blob })]);
+          alert('Image copied to clipboard!');
+        };
+
+        downloadButton.onclick = () => {
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = 'letterboxd-poster.jpg';
+          a.click();
+        };
+
+      } catch (err) {
+        alert('Error: ' + err.message);
         overlay.classList.remove('show');
       }
     });

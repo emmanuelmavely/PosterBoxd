@@ -26,13 +26,14 @@
   <i class="fa-brands fa-letterboxd fa-beat-fade"></i>
   <p>Generating poster...</p>
 </div>
+<div id="loading-overlay">
+    <i class="fa-brands fa-letterboxd fa-beat-fade"></i>
+    <p>Generating poster...</p>
+  </div>
 
   <div class="container">
     <div class="logo-container">
-      <a href="https://github.com/emmanuelmavely/PosterBoxd" target="_blank" rel="noopener noreferrer">
-        <img src="assets/posterBoxd.png" alt="PosterBoxd Logo" class="logo logo-desktop">
-        <img src="assets/footer-posterboxd.png" alt="PosterBoxd Logo" class="logo logo-mobile">
-      </a>
+      <img src="assets/posterBoxd.png" alt="PosterBoxd Logo" class="logo">
     </div>
 
     <form id="image-form">
@@ -64,17 +65,12 @@
         <div id="custom-fields" style="display: none;">
           <label for="custom-rating">Rating:</label>
           <div class="rating-container">
-            <div class="interactive-stars" id="interactive-stars">
-              <span class="star" data-value="1">★</span>
-              <span class="star" data-value="2">★</span>
-              <span class="star" data-value="3">★</span>
-              <span class="star" data-value="4">★</span>
-              <span class="star" data-value="5">★</span>
+            <input type="range" id="custom-rating" class="rating-slider" min="0" max="10" step="0.5" value="0">
+            <div class="rating-stars">
+              <span class="stars-display">☆☆☆☆☆</span>
             </div>
-            <div class="rating-display" id="rating-display">0/5</div>
           </div>
-          <input type="hidden" id="custom-rating" value="0">
-
+          
           <label for="custom-tags">Hashtags:</label>
           <input type="text" id="custom-tags" placeholder="Enter hashtags separated by commas..." />
           
