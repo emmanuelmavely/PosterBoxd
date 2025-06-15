@@ -182,16 +182,27 @@ async function generatePosterImage(movieData, settings, selectedPosterIndex = 0,
   const createdBy = details.created_by?.map(c => c.name).join(', ') || '';
   const firstYear = details.first_air_date ? details.first_air_date.substring(0, 4) : '';
   const lastYear = details.last_air_date ? details.last_air_date.substring(0, 4) : '';
-  const yearRange = firstYear && lastYear && firstYear !== lastYear ? `${firstYear}–${lastYear}` : firstYear || year;
+  const status = details.status || '';
+  // Compose year range with status for TV
+  const yearRangeStatus = isTV && firstYear
+    ? `${firstYear}${lastYear && lastYear !== firstYear ? `–${lastYear}` : ''}${status ? ` (${status})` : ''}`
+    : year || '';
   const numSeasons = details.number_of_seasons;
   const numEpisodes = details.number_of_episodes;
-  const seasonInfo = (numSeasons && numEpisodes)
-    ? `${numSeasons} season${numSeasons > 1 ? 's' : ''}, ${numEpisodes} episode${numEpisodes > 1 ? 's' : ''}`
+  // Use episode_run_time array for TV runtime (average if array)
+  let tvRuntime = '';
+  if (isTV && Array.isArray(details.episode_run_time) && details.episode_run_time.length > 0) {
+    const avgRuntime = Math.round(details.episode_run_time.reduce((a, b) => a + b, 0) / details.episode_run_time.length);
+    tvRuntime = `${avgRuntime}min`;
+  }
+  // Compose season/episode/runtime info for TV
+  const seasonInfo = isTV && numSeasons && numEpisodes
+    ? `${tvRuntime ? tvRuntime + ' | ' : ''}${numSeasons} Season${numSeasons > 1 ? 's' : ''} | ${numEpisodes} Episode${numEpisodes > 1 ? 's' : ''}`
     : '';
 
   for (const key of contentOrder) {
     if (key === 'title' && settings.showTitle) addWrappedLine(title, 'title', 36);
-    else if (key === 'year' && settings.showYear && (yearRange || year)) addWrappedLine(yearRange, 'year');
+    else if (key === 'year' && settings.showYear && (yearRangeStatus || year)) addWrappedLine(yearRangeStatus, 'year');
     else if (key === 'genre' && settings.showGenre && genre.length && !isTV) addWrappedLine(genre.join(' | '), 'genre');
     else if (key === 'genre' && settings.showGenre && isTV && seasonInfo) addWrappedLine(seasonInfo, 'genre');
     else if (key === 'director' && settings.showDirector && !isTV && director) {
