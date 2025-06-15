@@ -38,19 +38,47 @@ document.addEventListener('DOMContentLoaded', () => {
     // Rating slider
     const ratingSlider = document.getElementById('custom-rating');
     const starsDisplay = document.querySelector('.stars-display');
-    
+
     function updateStarsDisplay(value) {
       const rating = parseFloat(value);
       const full = Math.floor(rating / 2);
       const half = (rating % 2) >= 1;
       const empty = 5 - full - (half ? 1 : 0);
-      
+
       starsDisplay.textContent = '★'.repeat(full) + (half ? '½' : '') + '☆'.repeat(empty);
     }
-    
+
     ratingSlider.addEventListener('input', (e) => {
       updateStarsDisplay(e.target.value);
     });
+
+    // Allow clicking on stars to set the slider value
+    starsDisplay.addEventListener('mousemove', (e) => {
+      const rect = starsDisplay.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const percent = Math.max(0, Math.min(1, x / rect.width));
+      let hoverRating = Math.round(percent * 10) / 2;
+      hoverRating = Math.max(0.5, Math.min(5, hoverRating));
+      const sliderValue = hoverRating * 2;
+      updateStarsDisplay(sliderValue);
+    });
+
+    starsDisplay.addEventListener('mouseleave', () => {
+      updateStarsDisplay(ratingSlider.value);
+    });
+
+    starsDisplay.addEventListener('click', (e) => {
+      const rect = starsDisplay.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const percent = Math.max(0, Math.min(1, x / rect.width));
+      let clickedRating = Math.round(percent * 10) / 2;
+      clickedRating = Math.max(0.5, Math.min(5, clickedRating));
+      ratingSlider.value = clickedRating * 2;
+      updateStarsDisplay(ratingSlider.value);
+    });
+
+    // Initialize
+    updateStarsDisplay(ratingSlider.value);
 
     // Search functionality
     const searchButton = document.getElementById('search-button');
