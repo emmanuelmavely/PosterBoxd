@@ -109,19 +109,35 @@
         <!-- Metadata Tab -->
         <div class="tab-content active" id="metadata-tab">
           <h2>🛠️ Customize Metadata Order</h2>
-          <ul id="reorder-list">
-            <li data-id="title"><span class="drag-handle">☰</span><input type="checkbox" id="show-title" checked> Title</li>
-            <li data-id="year"><span class="drag-handle">☰</span><input type="checkbox" id="show-year" checked> Year</li>
-            <li data-id="director"><span class="drag-handle">☰</span><input type="checkbox" id="show-director" checked> Director</li>
-            <li data-id="music"><span class="drag-handle">☰</span><input type="checkbox" id="show-music"> Music</li>
-            <li data-id="actors"><span class="drag-handle">☰</span><input type="checkbox" id="show-actors" checked> Actors</li>
-            <li data-id="genre"><span class="drag-handle">☰</span><input type="checkbox" id="show-genre" checked> Genre</li>
-            <li data-id="runtime"><span class="drag-handle">☰</span><input type="checkbox" id="show-runtime"> Run Time</li>
-            <li data-id="rating"><span class="drag-handle">☰</span><input type="checkbox" id="show-rating" checked> Rating</li>
-            <li data-id="heart" class="non-reorderable"><span class="drag-handle disabled">❤️</span><input type="checkbox" id="show-heart"> Heart (if liked)</li>
-            <li data-id="tags"><span class="drag-handle">☰</span><input type="checkbox" id="show-tags" checked> Tags</li>
-            <li data-id="watched-date" class="non-reorderable"><span class="drag-handle disabled">📅</span><input type="checkbox" id="show-watched-date" checked> Watched Date</li>
-          </ul>
+          
+          <!-- Classic mode metadata options -->
+          <div id="classic-metadata-options">
+            <ul id="reorder-list">
+              <li data-id="title"><span class="drag-handle">☰</span><input type="checkbox" id="show-title" checked> Title</li>
+              <li data-id="year"><span class="drag-handle">☰</span><input type="checkbox" id="show-year" checked> Year</li>
+              <li data-id="director"><span class="drag-handle">☰</span><input type="checkbox" id="show-director" checked> Director</li>
+              <li data-id="music"><span class="drag-handle">☰</span><input type="checkbox" id="show-music"> Music</li>
+              <li data-id="actors"><span class="drag-handle">☰</span><input type="checkbox" id="show-actors" checked> Actors</li>
+              <li data-id="genre"><span class="drag-handle">☰</span><input type="checkbox" id="show-genre" checked> Genre</li>
+              <li data-id="runtime"><span class="drag-handle">☰</span><input type="checkbox" id="show-runtime"> Run Time</li>
+              <li data-id="rating"><span class="drag-handle">☰</span><input type="checkbox" id="show-rating" checked> Rating</li>
+              <li data-id="heart" class="non-reorderable"><span class="drag-handle disabled">❤️</span><input type="checkbox" id="show-heart"> Heart (if liked)</li>
+              <li data-id="tags"><span class="drag-handle">☰</span><input type="checkbox" id="show-tags" checked> Tags</li>
+              <li data-id="watched-date" class="non-reorderable"><span class="drag-handle disabled">📅</span><input type="checkbox" id="show-watched-date" checked> Watched Date</li>
+            </ul>
+          </div>
+          
+          <!-- Experimental mode metadata options -->
+          <div id="experimental-metadata-options" style="display: none;">
+            <ul id="experimental-reorder-list">
+              <li data-id="logo"><span class="drag-handle disabled">🏷️</span><input type="checkbox" id="exp-show-logo" checked disabled> Movie Logo</li>
+              <li data-id="credits"><span class="drag-handle disabled">🎬</span><input type="checkbox" id="exp-show-credits" checked> Credits</li>
+              <li data-id="rating"><span class="drag-handle disabled">⭐</span><input type="checkbox" id="exp-show-rating" checked> Rating Stars</li>
+              <li data-id="tags" class="non-reorderable"><span class="drag-handle disabled">#️⃣</span><input type="checkbox" id="exp-show-tags"> Hashtags</li>
+              <li data-id="watched-date" class="non-reorderable"><span class="drag-handle disabled">📅</span><input type="checkbox" id="exp-show-watched-date"> Watched Date</li>
+            </ul>
+            <p class="note">Note: In Experimental mode, elements appear in a fixed order with the logo at top.</p>
+          </div>
         </div>
 
         <!-- Visual Tab -->
@@ -133,17 +149,35 @@
           <label>Backdrop Brightness: <span id="backdrop-brightness-value">60</span>%</label>
           <input type="range" id="backdrop-brightness" min="0" max="100" value="60">
 
-          <label>Poster Scale: <span id="poster-scale-value">1.0</span>x</label>
-          <input type="range" id="poster-scale" min="0.5" max="2.0" step="0.1" value="1.0">
-
+          <!-- Poster-only settings (hidden in Experimental mode) -->
+          <div class="poster-only-setting">
+            <label>Poster Scale: <span id="poster-scale-value">1.0</span>x</label>
+            <input type="range" id="poster-scale" min="0.5" max="2.0" step="0.1" value="1.0">
+            
+            <label>Poster Top Margin: <span id="poster-top-value">240</span>px</label>
+            <input type="range" id="poster-top" min="50" max="400" value="240">
+            
+            <label>Title Below Poster: <span id="title-below-poster-value">60</span>px</label>
+            <input type="range" id="title-below-poster" min="10" max="200" value="60">
+          </div>
+          
+          <!-- Experimental-only settings (shown only in Experimental mode) -->
+          <div class="experimental-only-setting" style="display: none;">
+            <label>Logo Scale: <span id="logo-scale-value">1.0</span>x</label>
+            <input type="range" id="logo-scale" min="0.5" max="2.0" step="0.1" value="1.0">
+            
+            <label>Credits Font Size: <span id="credits-font-size-value">28</span>px</label>
+            <input type="range" id="credits-font-size" min="20" max="36" step="1" value="28">
+            
+            <label for="logo-alignment">Logo Alignment:</label>
+            <select id="logo-alignment">
+              <option value="left">Left-aligned</option>
+              <option value="center">Centered</option>
+            </select>
+          </div>
+          
           <label>Footer Scale: <span id="footer-scale-value">1.0</span>x</label>
           <input type="range" id="footer-scale" min="0.5" max="2.0" step="0.1" value="1.0">
-
-          <label>Poster Top Margin: <span id="poster-top-value">240</span>px</label>
-          <input type="range" id="poster-top" min="50" max="400" value="240">
-
-          <label>Title Below Poster: <span id="title-below-poster-value">60</span>px</label>
-          <input type="range" id="title-below-poster" min="10" max="200" value="60">
 
           <label>Line Height: <span id="line-height-value">72</span>px</label>
           <input type="range" id="line-height" min="20" max="120" value="72">

@@ -152,7 +152,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Live update slider labels
     const sliderIds = [
       'poster-top', 'title-below-poster', 'line-height',
-      'between-sections', 'backdrop-brightness', 'poster-scale', 'footer-scale'
+      'between-sections', 'backdrop-brightness', 'poster-scale', 
+      'footer-scale', 'logo-scale', 'credits-font-size'
     ];
 
     sliderIds.forEach(id => {
@@ -198,6 +199,36 @@ document.addEventListener('DOMContentLoaded', () => {
     const posterOptionsDiv = document.getElementById('poster-options');
     const backgroundOptionsDiv = document.getElementById('background-options');
     const backgroundSection = document.querySelector('.menu-section:last-child');
+
+    // Elements that need to be toggled based on poster style
+    const posterRelatedSettings = document.querySelectorAll('.poster-only-setting');
+    const experimentalRelatedSettings = document.querySelectorAll('.experimental-only-setting');
+    
+    // When poster style changes, update settings panel and defaults
+    posterStyleSelect.addEventListener('change', () => {
+      const isExperimental = posterStyleSelect.value === 'experimental';
+      
+      // Update blur default for experimental
+      if (isExperimental) {
+        blurBackdropCheckbox.checked = false;
+        
+        // Show experimental-only settings, hide poster-only settings
+        posterRelatedSettings.forEach(el => el.style.display = 'none');
+        experimentalRelatedSettings.forEach(el => el.style.display = '');
+        
+        // Show experimental metadata options, hide classic ones
+        document.getElementById('classic-metadata-options').style.display = 'none';
+        document.getElementById('experimental-metadata-options').style.display = 'block';
+      } else {
+        // Classic mode - restore default settings visibility
+        posterRelatedSettings.forEach(el => el.style.display = '');
+        experimentalRelatedSettings.forEach(el => el.style.display = 'none');
+        
+        // Show classic metadata options, hide experimental ones
+        document.getElementById('classic-metadata-options').style.display = 'block';
+        document.getElementById('experimental-metadata-options').style.display = 'none';
+      }
+    });
 
     // Function to create option items
     function createOptionItem(src, type, index, isActive = false) {
@@ -419,21 +450,41 @@ document.addEventListener('DOMContentLoaded', () => {
         };
       }
 
-      // Gather settings fresh on submit
-      const order = Array.from(document.querySelectorAll('#reorder-list li:not(.non-reorderable)')).map(li => li.dataset.id);
+      // Gather settings based on poster style
+      const isExperimental = posterStyleSelect.value === 'experimental';
+      let contentOrder, metadataSettings;
+      
+      if (isExperimental) {
+        // Fixed order for experimental
+        contentOrder = ['logo', 'credits', 'rating', 'tags', 'watched-date'];
+        metadataSettings = {
+          showLogo: true, // Always show logo/title in experimental
+          showCredits: document.getElementById('exp-show-credits').checked,
+          showRating: document.getElementById('exp-show-rating').checked,
+          showTags: document.getElementById('exp-show-tags').checked,
+          showWatchedDate: document.getElementById('exp-show-watched-date').checked
+        };
+      } else {
+        // Order from sortable for classic
+        contentOrder = Array.from(document.querySelectorAll('#reorder-list li:not(.non-reorderable)')).map(li => li.dataset.id);
+        metadataSettings = {
+          showTitle: document.getElementById('show-title').checked,
+          showYear: document.getElementById('show-year').checked,
+          showGenre: document.getElementById('show-genre').checked,
+          showDirector: document.getElementById('show-director').checked,
+          showMusic: document.getElementById('show-music').checked,
+          showActors: document.getElementById('show-actors').checked,
+          showRating: document.getElementById('show-rating').checked,
+          showHeart: document.getElementById('show-heart').checked,
+          showTags: document.getElementById('show-tags').checked,
+          showRuntime: document.getElementById('show-runtime').checked,
+          showWatchedDate: document.getElementById('show-watched-date').checked
+        };
+      }
+
       const settings = {
-        contentOrder: order,
-        showTitle: document.getElementById('show-title').checked,
-        showYear: document.getElementById('show-year').checked,
-        showGenre: document.getElementById('show-genre').checked,
-        showDirector: document.getElementById('show-director').checked,
-        showMusic: document.getElementById('show-music').checked,
-        showActors: document.getElementById('show-actors').checked,
-        showRating: document.getElementById('show-rating').checked,
-        showHeart: document.getElementById('show-heart').checked,
-        showTags: document.getElementById('show-tags').checked,
-        showRuntime: document.getElementById('show-runtime').checked,
-        showWatchedDate: document.getElementById('show-watched-date').checked,
+        contentOrder: contentOrder,
+        ...metadataSettings,
         blurBackdrop: document.getElementById('blur-backdrop').checked,
         gradientOverlay: document.getElementById('gradient-toggle').checked,
         backdropBrightness: parseFloat(document.getElementById('backdrop-brightness').value) / 100,
@@ -445,12 +496,22 @@ document.addEventListener('DOMContentLoaded', () => {
           lineHeight: parseInt(document.getElementById('line-height').value),
           betweenSections: parseInt(document.getElementById('between-sections').value),
         },
-        posterStyle: posterStyleSelect.value // <-- Add this line
+        posterStyle: posterStyleSelect.value,
+        experimentalSettings: {
+          creditsFontSize: document.getElementById('credits-font-size')?.value || 28,
+          logoAlignment: document.getElementById('logo-alignment')?.value || 'left',
+          logoScale: parseFloat(document.getElementById('logo-scale')?.value || 1.0)
+        }
       };
 
       currentSettings = settings;
 
       try {
+        console.log('Sending request with data:', {
+          ...requestData,
+          settings
+        });
+        
         const res = await fetch('/generate-image', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -460,9 +521,14 @@ document.addEventListener('DOMContentLoaded', () => {
           })
         });
 
-        if (!res.ok) throw new Error('Failed to generate image');
+        if (!res.ok) {
+          const errorText = await res.text();
+          throw new Error(`Failed to generate image: ${errorText}`);
+        }
 
         const responseData = await res.json();
+        console.log('Received response:', responseData);
+        
         const blob = new Blob([new Uint8Array(responseData.imageBuffer.data)], { type: 'image/jpeg' });
         const url = URL.createObjectURL(blob);
         
@@ -487,6 +553,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
       } catch (err) {
+        console.error('Error generating poster:', err);
         alert('Error: ' + err.message);
         overlay.classList.remove('show');
       }

@@ -587,7 +587,7 @@ div.search-result-poster {
 }
 
 #poster-style-select {
-  width: 95%;
+  width: 100%; /* Changed from 95% to 100% */
   font-size: 16px;
   border-radius: 12px;
   padding: 0.75rem;
@@ -621,4 +621,28 @@ div.search-result-poster {
   max-height: 100%;
   object-fit: contain;  /* Keep aspect ratio of logos */
   background: #2c2c2e;  /* Dark background for transparent logos */
+}
+
+/* Mode-specific settings */
+.poster-only-setting,
+.experimental-only-setting {
+  border-left: 3px solid #0a84ff;
+  padding-left: 10px;
+  margin: 10px 0;
+  background: rgba(10, 132, 255, 0.05);
+  border-radius: 4px;
+}
+
+/* New logo alignment selector */
+#logo-alignment {
+  width: 95%;
+  font-size: 16px;
+  border-radius: 12px;
+  padding: 0.75rem;
+  background: #3a3a3c;
+  color: #fff;
+  border: 1px solid #555;
+  margin-top: 0.25rem;
+  margin-bottom: 1rem;
+  box-sizing: border-box;
 }

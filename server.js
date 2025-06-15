@@ -125,9 +125,10 @@ function groupCrewByRole(credits) {
   const roleOrder = [
     'Director',
     'Writer',
-    'Producer',
+    'Sound',
+    'Cast', // Added Cast to role order
     'Director of Photography',
-    'Sound'
+    'Producer'
   ];
   const roleMap = {};
   for (const member of credits.crew) {
@@ -138,6 +139,12 @@ function groupCrewByRole(credits) {
     if (!roleMap[job]) roleMap[job] = [];
     if (!roleMap[job].includes(member.name)) roleMap[job].push(member.name);
   }
+  
+  // Add cast members if available (top 3)
+  if (credits.cast && credits.cast.length > 0) {
+    roleMap['Cast'] = credits.cast.slice(0, 3).map(actor => actor.name);
+  }
+  
   // Combine Director & Writer if same person
   let combined = [];
   if (
@@ -154,7 +161,7 @@ function groupCrewByRole(credits) {
     delete roleMap['Director'];
     delete roleMap['Writer'];
   }
-  // Add remaining roles in order, combine all names for each role
+  // Add remaining roles in order
   roleOrder.forEach(role => {
     if (roleMap[role]) {
       combined.push({
@@ -177,7 +184,7 @@ function getStarString(rating) {
 
 // Experimental poster generator
 async function generateExperimentalPoster(movieData, settings, selectedPosterIndex = 0, selectedBackgroundIndex = 0, selectedLogoIndex = 0) {
-  const { movie, details, credits, images, username, rating } = movieData;
+  const { movie, details, credits, images, username, rating, tags, watchedDate } = movieData;
   const width = 1080, height = 1920;
 
   // Backdrop: sort by quality, use best as default
@@ -210,9 +217,10 @@ async function generateExperimentalPoster(movieData, settings, selectedPosterInd
   const leftX = 80;
   let y = 1150;
   const lineGap = 40;
-  const titleCrewGap = 50; // Increased from 14 to 50 for better spacing
+  const titleCrewGap = 50;
   const crewStarsGap = 40;
-  const logoW = 600, logoH = 120;
+  const logoScale = settings.experimentalSettings?.logoScale || 1.0;
+  const logoW = 600 * logoScale, logoH = 120 * logoScale;
   const MAX_CREDIT_LINE_CHARS = 60;
 
   // SVG content
@@ -262,8 +270,9 @@ async function generateExperimentalPoster(movieData, settings, selectedPosterInd
           // Minimum reasonable size for an image (1KB)
           if (logoBuffer.length > 1024) {
             const logoDataUrl = `data:${contentType || 'image/png'};base64,${logoBuffer.toString('base64')}`;
-            // Change preserveAspectRatio from "xMidYMid meet" to "xMinYMid meet" to left-align the logo
-            svgContent += `<image x="${leftX}" y="${y}" width="${logoW}" height="${logoH}" xlink:href="${logoDataUrl}" preserveAspectRatio="xMinYMid meet" />`;
+            // Apply logo alignment (left or center)
+            const logoX = settings.experimentalSettings?.logoAlignment === 'center' ? (width - logoW) / 2 : leftX;
+            svgContent += `<image x="${logoX}" y="${y}" width="${logoW}" height="${logoH}" xlink:href="${logoDataUrl}" preserveAspectRatio="xMinYMid meet" />`;
             y += logoH + titleCrewGap;
             logoPlaced = true;
             console.log(`[PosterBoxd] Logo placed successfully from ${size}`);
@@ -289,11 +298,11 @@ async function generateExperimentalPoster(movieData, settings, selectedPosterInd
   const groupedByRole = groupCrewByRole(credits);
   groupedByRole.forEach(item => {
     let displayNames = [...item.names];
-    let creditText = `${item.role}: ${displayNames.join(' / ')}`;
+    let creditText = `${item.role}: ${displayNames.join(', ')}`;
     // Character limit logic
     while (creditText.length > MAX_CREDIT_LINE_CHARS && displayNames.length > 1) {
       displayNames.pop();
-      creditText = `${item.role}: ${displayNames.join(' / ')} & others`;
+      creditText = `${item.role}: ${displayNames.join(', ')} & others`;
     }
     if (creditText.length > MAX_CREDIT_LINE_CHARS && displayNames.length === 1) {
       const maxNameLength = MAX_CREDIT_LINE_CHARS - `${item.role}: `.length - 3;
@@ -301,9 +310,11 @@ async function generateExperimentalPoster(movieData, settings, selectedPosterInd
       creditText = `${item.role}: ${displayNames[0]}`;
     }
     const colonIndex = creditText.indexOf(':');
-    const rolePart = creditText.substring(0, colonIndex + 1);
-    const namesPart = creditText.substring(colonIndex + 1);
-    svgContent += `<text x="${leftX}" y="${y}" class="credit-line">${escapeXml(rolePart)}<tspan class="credit-name">${escapeXml(namesPart)}</tspan></text>`;
+    const rolePart = creditText.substring(0, colonIndex + 1); // This includes the colon
+    const namesPart = creditText.substring(colonIndex + 1); // This includes the space after the colon
+    
+    // Add a space after the colon in the SVG
+    svgContent += `<text x="${leftX}" y="${y}" class="credit-line">${escapeXml(rolePart)} <tspan class="credit-name">${escapeXml(namesPart.trim())}</tspan></text>`;
     y += lineGap;
   });
 
@@ -313,6 +324,19 @@ async function generateExperimentalPoster(movieData, settings, selectedPosterInd
   // Rating stars (left-aligned, just below crew info)
   if (rating) {
     svgContent += `<text x="${leftX}" y="${y}" class="rating-stars" text-anchor="start">${escapeXml(getStarString(rating))}</text>`;
+    y += lineGap;
+  }
+
+  // Add tags if enabled and available
+  if (settings.showTags && tags && tags.length > 0) {
+    const tagText = tags.map(t => `#${t}`).join(' ');
+    svgContent += `<text x="${leftX}" y="${y}" class="tags" text-anchor="start">${escapeXml(tagText)}</text>`;
+    y += lineGap;
+  }
+
+  // Add watched date if enabled and available
+  if (settings.showWatchedDate && watchedDate) {
+    svgContent += `<text x="${leftX}" y="${y}" class="watched-date" text-anchor="start">Watched on ${escapeXml(watchedDate)}</text>`;
     y += lineGap;
   }
 
@@ -326,7 +350,7 @@ async function generateExperimentalPoster(movieData, settings, selectedPosterInd
     <image x="${(1080 - footerLogoW) / 2}" y="${footerY + 38}" width="${footerLogoW}" height="${footerLogoH}" xlink:href="${posterboxdLogoDataUrl}" class="logo-footer" />
   `;
 
-  // SVG style (add .title-year for thin Poppins)
+  // SVG style (add .title-year for thin Poppins + add tags and watched-date styles)
   let svg = `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
     <style><![CDATA[
       .logo-title { font-family: 'Poppins', sans-serif; font-size: 80px; font-weight: 700; fill: #fff; }
@@ -334,6 +358,8 @@ async function generateExperimentalPoster(movieData, settings, selectedPosterInd
       .credit-line { font-family: 'Poppins', sans-serif; font-size: 28px; font-weight: 400; fill: #fff; text-anchor: start; }
       .credit-name { font-family: 'Poppins', sans-serif; font-size: 28px; font-weight: 700; fill: #fff; }
       .rating-stars { font-family: 'Poppins', sans-serif; font-size: 54px; fill: #00d474; letter-spacing: 8px; }
+      .tags { font-family: 'Poppins', sans-serif; font-size: 24px; fill: #ccc; text-anchor: start; }
+      .watched-date { font-family: 'Poppins', sans-serif; font-size: 24px; fill: #aaa; text-anchor: start; }
       .footer-username { fill: #fff; font-size: 30px; font-weight: bold; font-family: 'SF Pro Text', 'Segoe UI', sans-serif; }
       .footer-on { fill: #aaa; font-size: 20px; font-family: 'SF Pro Text', 'Segoe UI', sans-serif; }
       .logo-footer { opacity: 0.9; }
@@ -562,6 +588,8 @@ async function generatePosterImage(movieData, settings, selectedPosterIndex = 0,
 
 app.post('/generate-image', async (req, res) => {
   try {
+    console.log('Received request with body:', JSON.stringify(req.body, null, 2));
+    
     const { mode, settings = {} } = req.body;
     let movieData;
 
@@ -716,6 +744,7 @@ app.post('/generate-image', async (req, res) => {
       movieData.alternativeBackdrops = backgrounds;
     }
 
+    console.log('Processing completed, sending response');
     res.json({
       imageBuffer: finalBuffer,
       sessionId: sessionId,
@@ -731,7 +760,11 @@ app.post('/generate-image', async (req, res) => {
 
   } catch (err) {
     console.error('❌ Error generating poster:', err);
-    res.status(500).json({ error: err.message });
+    // More detailed error response
+    res.status(500).json({ 
+      error: err.message,
+      stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+    });
   }
 });
 
