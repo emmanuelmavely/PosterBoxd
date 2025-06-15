@@ -13,12 +13,16 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     });
 
-    // Sortable list
+    // Sortable list - exclude non-reorderable items
     Sortable.create(document.getElementById('reorder-list'), {
       animation: 150,
-      handle: '.drag-handle',
+      handle: '.drag-handle:not(.disabled)',
       ghostClass: 'sortable-ghost',
-      touchStartThreshold: 10
+      touchStartThreshold: 10,
+      filter: '.non-reorderable',
+      onMove: function(evt) {
+        return !evt.related.classList.contains('non-reorderable');
+      }
     });
 
     const overlay = document.getElementById('loading-overlay');
@@ -150,7 +154,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const letterboxdUrl = urlMatch[1];
 
       // Gather settings fresh on submit
-      const order = Array.from(document.querySelectorAll('#reorder-list li')).map(li => li.dataset.id);
+      const order = Array.from(document.querySelectorAll('#reorder-list li:not(.non-reorderable)')).map(li => li.dataset.id);
       const settings = {
         contentOrder: order,
         showTitle: document.getElementById('show-title').checked,
@@ -160,8 +164,10 @@ document.addEventListener('DOMContentLoaded', () => {
         showMusic: document.getElementById('show-music').checked,
         showActors: document.getElementById('show-actors').checked,
         showRating: document.getElementById('show-rating').checked,
+        showHeart: document.getElementById('show-heart').checked,
         showTags: document.getElementById('show-tags').checked,
         showRuntime: document.getElementById('show-runtime').checked,
+        showWatchedDate: document.getElementById('show-watched-date').checked,
         blurBackdrop: document.getElementById('blur-backdrop').checked,
         gradientOverlay: document.getElementById('gradient-toggle').checked,
         backdropBrightness: parseFloat(document.getElementById('backdrop-brightness').value) / 100,

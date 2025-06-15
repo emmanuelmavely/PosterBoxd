@@ -78,7 +78,7 @@ function formatRuntime(runtime) {
 }
 
 async function generatePosterImage(movieData, settings, selectedPosterIndex = 0, selectedBackgroundIndex = 0) {
-  const { movie, details, credits, images, tags, username, rating } = movieData;
+  const { movie, details, credits, images, tags, username, rating, isLiked, watchedDate } = movieData;
   
   // Get selected poster and backdrop
   const posters = [movie.poster_path, ...(images.posters?.slice(0, 5).map(p => p.file_path) || [])].filter(Boolean);
@@ -87,7 +87,6 @@ async function generatePosterImage(movieData, settings, selectedPosterIndex = 0,
   const selectedPoster = posters[selectedPosterIndex] ? `https://image.tmdb.org/t/p/w500${posters[selectedPosterIndex]}` : null;
   const selectedBackdrop = backdrops[selectedBackgroundIndex] ? `https://image.tmdb.org/t/p/w1280${backdrops[selectedBackgroundIndex]}` : null;
 
-  // Rest of the image generation logic remains the same, but use selectedPoster and selectedBackdrop
   const width = 1080, height = 1920;
   const spacing = settings.spacing || {};
   const posterY = spacing.posterTop || 240;
@@ -152,12 +151,24 @@ async function generatePosterImage(movieData, settings, selectedPosterIndex = 0,
       svgParts.push(`<text x="${width / 2}" y="${currentY}" text-anchor="middle" class="label">music by <tspan font-weight="bold">${escapeXml(musicDirector)}</tspan></text>`);
       currentY += lineHeight;
     } else if (key === 'actors' && settings.showActors && actors.length) addWrappedLine(actors.join(', '), 'actors', 60);
-    else if (key === 'rating' && settings.showRating && rating) {
-      const full = Math.floor(rating), half = rating % 1 >= 0.5, empty = 5 - full - (half ? 1 : 0);
-      const stars = '★'.repeat(full) + (half ? '½' : '') + '☆'.repeat(empty);
+    else if (key === 'rating' && settings.showRating && (rating || isLiked)) {
       currentY += Math.round(lineHeight / 2);
-      svgParts.push(`<text x="${width / 2}" y="${currentY}" text-anchor="middle" class="stars">${stars}</text>`);
-      currentY += lineHeight + betweenSections - lineHeight;
+      
+      // Show rating stars if available
+      if (rating) {
+        const full = Math.floor(rating), half = rating % 1 >= 0.5, empty = 5 - full - (half ? 1 : 0);
+        const stars = '★'.repeat(full) + (half ? '½' : '') + '☆'.repeat(empty);
+        svgParts.push(`<text x="${width / 2}" y="${currentY}" text-anchor="middle" class="stars">${stars}</text>`);
+        currentY += lineHeight;
+      }
+      
+      // Show heart if liked
+      if (isLiked) {
+        svgParts.push(`<text x="${width / 2}" y="${currentY}" text-anchor="middle" class="heart">♥</text>`);
+        currentY += lineHeight;
+      }
+      
+      currentY += betweenSections - lineHeight;
     } else if (key === 'tags' && settings.showTags && tags.length) {
       wrapText(tags.map(t => `#${t}`).join(' '), 60).forEach(line => {
         svgParts.push(`<text x="${width / 2}" y="${currentY}" text-anchor="middle" class="tags">${escapeXml(line)}</text>`);
@@ -167,15 +178,23 @@ async function generatePosterImage(movieData, settings, selectedPosterIndex = 0,
     }
   }
 
-  // Footer
-  const footerY = height - 130;
+  // Footer with watched date
+  const footerY = height - (watchedDate ? 160 : 130); // Adjust footer position if watched date exists
   const logoW = Math.round(160 * footerScale);
   const logoH = Math.round(22 * footerScale);
+  
   svgParts.push(
     `<text x="${width / 2}" y="${footerY}" text-anchor="middle" class="footer-username">${escapeXml(username)}</text>`,
     `<text x="${width / 2}" y="${footerY + 26}" text-anchor="middle" class="footer-on">— on —</text>`,
     `<image x="${(width - logoW) / 2}" y="${footerY + 40}" width="${logoW}" height="${logoH}" xlink:href="${logoDataUrl}" class="logo-footer" />`
   );
+
+  // Add watched date above footer if available and enabled
+  if (watchedDate && settings.showWatchedDate) {
+    svgParts.push(
+      `<text x="${width / 2}" y="${footerY - 60}" text-anchor="middle" class="watched-date">Watched on ${escapeXml(watchedDate)}</text>`
+    );
+  }
 
   const textSvg = `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
     <style>
@@ -186,9 +205,11 @@ async function generatePosterImage(movieData, settings, selectedPosterIndex = 0,
       .bold { fill: #fff; font-weight: bold; font-size: 32px; font-family: 'SF Pro Text', 'Segoe UI', sans-serif; }
       .actors { fill: #ddd; font-size: 30px; font-style: italic; font-family: 'SF Pro Text', 'Segoe UI', sans-serif; }
       .tags { fill: #ccc; font-size: 28px; font-family: 'SF Pro Text', 'Segoe UI', sans-serif; }
-      .stars { fill: gold; font-size: 60px; font-family: 'SF Pro Rounded', 'Segoe UI', sans-serif; letter-spacing: 5px; }
+      .stars { fill: #00c030; font-size: 60px; font-family: 'SF Pro Rounded', 'Segoe UI', sans-serif; letter-spacing: 5px; }
+      .heart { fill: #ff9010; font-size: 60px; font-family: 'SF Pro Rounded', 'Segoe UI', sans-serif; }
       .footer-username { fill: #fff; font-size: 30px; font-weight: bold; font-family: 'SF Pro Text', 'Segoe UI', sans-serif; }
       .footer-on { fill: #aaa; font-size: 20px; font-family: 'SF Pro Text', 'Segoe UI', sans-serif; }
+      .watched-date { fill: #666; font-size: 24px; font-style: SF Pro Text; font-family: 'SF Pro Text', 'Segoe UI', sans-serif; opacity: 0.8; }
       .logo-footer { opacity: 0.9; }
     </style>
     ${svgParts.join('\n')}
@@ -228,11 +249,29 @@ app.post('/generate-image', async (req, res) => {
     const username = $('.person-summary .name span').first().text().trim();
     const tags = $('ul.tags li a').map((_, el) => $(el).text().trim()).get();
     const rating = ($('.rating-large').attr('class')?.match(/rated-large-(\d+)/)?.[1] || 0) / 2;
+    
+    // Check if the review is liked (heart present)
+    const isLiked = $('.icon-liked').length > 0;
+
+    // Extract watched date
+    let watchedDate = null;
+    const viewDateElement = $('.view-date.date-links');
+    if (viewDateElement.length) {
+      const dateLinks = viewDateElement.find('a');
+      if (dateLinks.length >= 3) {
+        const day = $(dateLinks[0]).text().trim();
+        const month = $(dateLinks[1]).text().trim();
+        const year = $(dateLinks[2]).text().trim();
+        watchedDate = `${day} ${month} ${year}`;
+      }
+    }
 
     console.log('🎬 Title:', title);
     console.log('📅 Year:', year);
     console.log('🎞️ Director:', directorText);
     console.log('👤 Username:', username);
+    console.log('📅 Watched on:', watchedDate);
+    console.log('❤️ Liked:', isLiked);
 
     const { movie, details, credits, images } = await fetchTmdbData(title, year, directorText);
 
@@ -242,6 +281,8 @@ app.post('/generate-image', async (req, res) => {
       username,
       tags,
       rating,
+      isLiked,
+      watchedDate, // Add watched date to movie data
       movie,
       details,
       credits,
