@@ -55,7 +55,8 @@ input[type="checkbox"] {
 }
 
 input[type="text"],
-input[type="url"] {
+input[type="url"],
+input[type="date"] {
   width: 95%;
   padding: 0.75rem;
   font-size: 16px;
@@ -203,14 +204,46 @@ ul#reorder-list li.non-reorderable .drag-handle.disabled:hover {
 
 .logo-container {
   text-align: center;
-  margin-bottom: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.logo-container a {
+  display: inline-block;
+  text-decoration: none;
 }
 
 .logo {
-  max-width: 100%; /* Ensures the logo scales down to fit the screen */
-  height: auto;    /* Maintains the aspect ratio */
-  max-height: 150px; /* Optional: Limits the height for smaller screens */
-  object-fit: contain;
+  height: auto;
+  transition: opacity 0.2s ease;
+}
+
+.logo-container a:hover .logo {
+  opacity: 0.8;
+}
+
+/* Desktop logo - reasonable size */
+.logo-desktop {
+  display: block;
+  max-width: 300px;
+  width: 100%;
+}
+
+/* Mobile logo - good size for mobile screens */
+.logo-mobile {
+  display: none;
+  max-width: 280px;
+  width: 100%;
+}
+
+/* On smaller screens, show mobile logo and hide desktop */
+@media (max-width: 768px) {
+  .logo-desktop {
+    display: none;
+  }
+  
+  .logo-mobile {
+    display: block;
+  }
 }
 
 .bold {
@@ -318,11 +351,9 @@ ul#reorder-list li.non-reorderable .drag-handle.disabled:hover {
 .mode-selector {
   display: flex;
   gap: 0.5rem;
-  margin: 1.5rem;
-  padding: 0.25rem;
-  background: #2c2c2e;
-  border-radius: 16px;
-  border: 1px solid #3a3a3c;
+  margin-bottom: 1.5rem;
+  margin-top: 1.5rem;
+  justify-content: center;
 }
 
 .mode-pill {
@@ -427,55 +458,71 @@ div.search-result-poster {
 .search-result-type {
   background: #0a84ff;
   color: white;
-  font-size: 10px;
-  padding: 2px 6px;
+  padding: 0.125rem 0.375rem;
   border-radius: 4px;
+  font-size: 10px;
   font-weight: 600;
   text-transform: uppercase;
   margin-left: 0.5rem;
 }
 
-/* Rating Slider */
+/* Red tag for TV series */
+.search-result-type.tv {
+  background: #ff3b30;
+}
+
+/* Interactive Star Rating */
 .rating-container {
   display: flex;
   align-items: center;
+  justify-content: flex-start;
   gap: 1rem;
+  margin-top: 0.25rem;
   margin-bottom: 1rem;
 }
 
-.rating-slider {
-  flex: 1;
-  height: 32px;
-  background: transparent;
-  outline: none;
-  -webkit-appearance: none;
-}
-
-.rating-slider::-webkit-slider-track {
-  width: 100%;
-  height: 32px;
-  background: linear-gradient(to right, transparent 0%, transparent 50%, #3a3a3c 50%, #3a3a3c 100%);
-  border-radius: 16px;
-}
-
-.rating-slider::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  width: 32px;
-  height: 32px;
-  background: #0a84ff;
+.interactive-stars {
+  display: flex;
+  gap: 4px;
+  font-size: 32px;
   cursor: pointer;
-  border-radius: 50%;
-  border: 2px solid #fff;
+  user-select: none;
+  padding: 0.5rem;
+  border-radius: 8px;
+  transition: background-color 0.2s ease;
 }
 
-.rating-stars {
-  min-width: 100px;
+.interactive-stars:hover {
+  background-color: rgba(255, 255, 255, 0.1);
 }
 
-.stars-display {
-  font-size: 24px;
+.star {
+  position: relative;
+  color: #3a3a3c;
+  transition: color 0.2s ease;
+  cursor: pointer;
+}
+
+.star:hover {
+  transform: scale(1.1);
+}
+
+.star.filled {
   color: #00c030;
-  letter-spacing: 2px;
+}
+
+.star.half {
+  background: linear-gradient(90deg, #00c030 50%, #3a3a3c 50%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.rating-display {
+  font-size: 14px;
+  color: #8e8e93;
+  min-width: 60px;
+  text-align: left;
 }
 
 /* Settings Tabs */
@@ -517,19 +564,4 @@ div.search-result-poster {
 
 .tab-content.active {
   display: block;
-}
-
-/* Update input styles to include date */
-input[type="text"],
-input[type="url"],
-input[type="date"] {
-  width: 95%;
-  padding: 0.75rem;
-  font-size: 16px;
-  border-radius: 12px;
-  border: 1px solid #555;
-  background-color: #3a3a3c;
-  color: #fff;
-  margin-top: 0.25rem;
-  margin-bottom: 1rem;
 }

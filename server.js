@@ -27,23 +27,21 @@ const movieDataStore = new Map();
 const TMDB_API_KEY = process.env.TMDB_API_KEY;
 
 // Search endpoint
+// Replace the search endpoint with multi-search
 app.post('/search-media', async (req, res) => {
   try {
     const { query } = req.body;
     
-    // Search both movies and TV shows
-    const [movieResults, tvResults] = await Promise.all([
-      fetch(`https://api.themoviedb.org/3/search/movie?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(query)}`).then(r => r.json()),
-      fetch(`https://api.themoviedb.org/3/search/tv?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(query)}`).then(r => r.json())
-    ]);
+    // Use multi-search API - combines movies, TV shows, and people in one call
+    const searchResults = await fetch(`https://api.themoviedb.org/3/search/multi?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(query)}`).then(r => r.json());
     
-    // Combine and sort by popularity
-    const allResults = [
-      ...(movieResults.results || []).map(item => ({ ...item, media_type: 'movie' })),
-      ...(tvResults.results || []).map(item => ({ ...item, media_type: 'tv' }))
-    ].sort((a, b) => b.popularity - a.popularity).slice(0, 10);
+    // Filter out person results, keep only movies and TV shows
+    const mediaResults = (searchResults.results || [])
+      .filter(item => item.media_type === 'movie' || item.media_type === 'tv')
+      .sort((a, b) => b.popularity - a.popularity)
+      .slice(0, 10);
     
-    res.json({ results: allResults });
+    res.json({ results: mediaResults });
   } catch (error) {
     console.error('Search error:', error);
     res.status(500).json({ error: 'Search failed' });
@@ -72,26 +70,41 @@ function wrapText(text, maxChars) {
 
 async function fetchTmdbData(title, year = '', expectedDirector = '') {
   console.log('🔍 Searching TMDb for:', title, year, expectedDirector);
+  
+  // First, search for the movie
   const searchUrl = `https://api.themoviedb.org/3/search/movie?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(title)}${year ? `&year=${year}` : ''}`;
   const searchData = await fetch(searchUrl).then(res => res.json());
   const results = searchData.results || [];
 
-  for (const movie of results) {
-    const credits = await fetch(`https://api.themoviedb.org/3/movie/${movie.id}/credits?api_key=${TMDB_API_KEY}`).then(res => res.json());
-    const director = credits.crew.find(c => c.job === 'Director')?.name || '';
-    if (expectedDirector && director.toLowerCase().includes(expectedDirector.toLowerCase())) {
-      const details = await fetch(`https://api.themoviedb.org/3/movie/${movie.id}?api_key=${TMDB_API_KEY}`).then(res => res.json());
-      const images = await fetch(`https://api.themoviedb.org/3/movie/${movie.id}/images?api_key=${TMDB_API_KEY}`).then(res => res.json());
-      return { movie, details, credits, images };
+  if (!results.length) throw new Error('No TMDb match found');
+
+  // Get the first result or best match
+  let selectedMovie = results[0];
+  
+  // If we have an expected director, try to find a better match
+  if (expectedDirector && results.length > 1) {
+    for (const movie of results.slice(0, 3)) { // Only check top 3 results
+      const detailsUrl = `https://api.themoviedb.org/3/movie/${movie.id}?api_key=${TMDB_API_KEY}&append_to_response=credits`;
+      const data = await fetch(detailsUrl).then(res => res.json());
+      const director = data.credits?.crew?.find(c => c.job === 'Director')?.name || '';
+      
+      if (director.toLowerCase().includes(expectedDirector.toLowerCase())) {
+        selectedMovie = movie;
+        break;
+      }
     }
   }
-
-  if (!results.length) throw new Error('No TMDb match found');
-  const fallback = results[0];
-  const details = await fetch(`https://api.themoviedb.org/3/movie/${fallback.id}?api_key=${TMDB_API_KEY}`).then(res => res.json());
-  const credits = await fetch(`https://api.themoviedb.org/3/movie/${fallback.id}/credits?api_key=${TMDB_API_KEY}`).then(res => res.json());
-  const images = await fetch(`https://api.themoviedb.org/3/movie/${fallback.id}/images?api_key=${TMDB_API_KEY}`).then(res => res.json());
-  return { movie: fallback, details, credits, images };
+  
+  // Fetch all data in one call using append_to_response
+  const fullDataUrl = `https://api.themoviedb.org/3/movie/${selectedMovie.id}?api_key=${TMDB_API_KEY}&append_to_response=credits,images`;
+  const fullData = await fetch(fullDataUrl).then(res => res.json());
+  
+  return {
+    movie: selectedMovie,
+    details: fullData,
+    credits: fullData.credits,
+    images: fullData.images
+  };
 }
 
 // Convert runtime to hours and minutes
@@ -154,7 +167,7 @@ async function generatePosterImage(movieData, settings, selectedPosterIndex = 0,
   const logoDataUrl = `data:image/png;base64,${logoBuffer.toString('base64')}`;
 
   // Adjust footer scale for custom mode
-  const defaultFooterScale = isCustomMode ? 1.9 : settings.footerScale ?? 1.0;
+  const defaultFooterScale = isCustomMode ? 1.9 : footerScale;
 
   const svgParts = [];
   let currentY = posterY + posterHeight + titleOffset;
@@ -172,17 +185,35 @@ async function generatePosterImage(movieData, settings, selectedPosterIndex = 0,
   const title = movieData.title;
   const year = movieData.year;
   const genre = details.genres?.map(g => g.name) || [];
-  const director = credits.crew.find(c => c.job === 'Director')?.name || '';
-  const musicDirector = credits.crew.find(c => c.job === 'Original Music Composer')?.name || '';
-  const actors = credits.cast?.slice(0, 3).map(c => c.name) || [];
+  
+  // Handle director for movies or creator for TV shows
+  let creatorOrDirector = '';
+  let creatorLabel = 'directed by';
+  
+  if (movieData.isCustomMode && movieData.movie.first_air_date) {
+    // TV Show - look for creators
+    const creators = details.created_by?.map(c => c.name) || [];
+    if (creators.length > 0) {
+      creatorOrDirector = creators.join(' & ');
+      creatorLabel = 'created by';
+    }
+  } else {
+    // Movie - look for director - make sure credits exists
+    if (credits && credits.crew) {
+      creatorOrDirector = credits.crew.find(c => c.job === 'Director')?.name || '';
+    }
+  }
+  
+  const musicDirector = credits?.crew?.find(c => c.job === 'Original Music Composer')?.name || '';
+  const actors = credits?.cast?.slice(0, 3).map(c => c.name) || [];
   const runtime = details.runtime ? formatRuntime(details.runtime) : null;
 
   for (const key of contentOrder) {
     if (key === 'title' && settings.showTitle) addWrappedLine(title, 'title', 36);
     else if (key === 'year' && settings.showYear && year) addWrappedLine(year, 'year');
     else if (key === 'genre' && settings.showGenre && genre.length) addWrappedLine(genre.join(' | '), 'genre');
-    else if (key === 'director' && settings.showDirector && director) {
-      svgParts.push(`<text x="${width / 2}" y="${currentY}" text-anchor="middle" class="label">directed by <tspan font-weight="bold">${escapeXml(director)}</tspan></text>`);
+    else if (key === 'director' && settings.showDirector && creatorOrDirector) {
+      svgParts.push(`<text x="${width / 2}" y="${currentY}" text-anchor="middle" class="label">${creatorLabel} <tspan font-weight="bold">${escapeXml(creatorOrDirector)}</tspan></text>`);
       currentY += lineHeight;
     } else if (key === 'runtime' && settings.showRuntime && runtime) addWrappedLine(runtime, 'label');
     else if (key === 'music' && settings.showMusic && musicDirector) {
@@ -339,56 +370,53 @@ app.post('/generate-image', async (req, res) => {
       
     } else {
       // Custom mode
-      const { mediaId, mediaType, rating, tags, username, watchedDate } = req.body;
-      
-      let mediaData;
-      if (mediaType === 'tv') {
-        mediaData = await fetch(`https://api.themoviedb.org/3/tv/${mediaId}?api_key=${TMDB_API_KEY}`).then(res => res.json());
-        const credits = await fetch(`https://api.themoviedb.org/3/tv/${mediaId}/credits?api_key=${TMDB_API_KEY}`).then(res => res.json());
-        const images = await fetch(`https://api.themoviedb.org/3/tv/${mediaId}/images?api_key=${TMDB_API_KEY}`).then(res => res.json());
-        
-        movieData = {
-          title: mediaData.name,
-          year: mediaData.first_air_date ? mediaData.first_air_date.substring(0, 4) : '',
-          username,
-          tags,
-          rating,
-          isLiked: false,
-          watchedDate: watchedDate || null,
-          movie: mediaData,
-          details: mediaData,
-          credits,
-          images,
-          isCustomMode: true,
-          mainPoster: mediaData.poster_path ? `https://image.tmdb.org/t/p/w500${mediaData.poster_path}` : null,
-          mainBackdrop: mediaData.backdrop_path ? `https://image.tmdb.org/t/p/w1280${mediaData.backdrop_path}` : null,
-          alternativePosters: images.posters?.slice(0, 5).map(p => `https://image.tmdb.org/t/p/w500${p.file_path}`) || [],
-          alternativeBackdrops: images.backdrops?.slice(0, 5).map(b => `https://image.tmdb.org/t/p/w1280${b.file_path}`) || []
-        };
-      } else {
-        const movie = await fetch(`https://api.themoviedb.org/3/movie/${mediaId}?api_key=${TMDB_API_KEY}`).then(res => res.json());
-        const credits = await fetch(`https://api.themoviedb.org/3/movie/${mediaId}/credits?api_key=${TMDB_API_KEY}`).then(res => res.json());
-        const images = await fetch(`https://api.themoviedb.org/3/movie/${mediaId}/images?api_key=${TMDB_API_KEY}`).then(res => res.json());
-        
-        movieData = {
-          title: movie.title,
-          year: movie.release_date ? movie.release_date.substring(0, 4) : '',
-          username,
-          tags,
-          rating,
-          isLiked: false,
-          watchedDate: watchedDate || null,
-          movie,
-          details: movie,
-          credits,
-          images,
-          isCustomMode: true,
-          mainPoster: movie.poster_path ? `https://image.tmdb.org/t/p/w500${movie.poster_path}` : null,
-          mainBackdrop: movie.backdrop_path ? `https://image.tmdb.org/t/p/w1280${movie.backdrop_path}` : null,
-          alternativePosters: images.posters?.slice(0, 5).map(p => `https://image.tmdb.org/t/p/w500${p.file_path}`) || [],
-          alternativeBackdrops: images.backdrops?.slice(0, 5).map(b => `https://image.tmdb.org/t/p/w1280${b.file_path}`) || []
-        };
-      }
+      // Custom mode
+const { mediaId, mediaType, rating, tags, username, watchedDate } = req.body;
+
+let fullData;
+if (mediaType === 'tv') {
+  fullData = await fetch(`https://api.themoviedb.org/3/tv/${mediaId}?api_key=${TMDB_API_KEY}&append_to_response=credits,images`).then(res => res.json());
+  
+  movieData = {
+    title: fullData.name,
+    year: fullData.first_air_date ? fullData.first_air_date.substring(0, 4) : '',
+    username,
+    tags,
+    rating,
+    isLiked: false,
+    watchedDate: watchedDate || null,
+    movie: fullData,
+    details: fullData,
+    credits: fullData.credits,
+    images: fullData.images,
+    isCustomMode: true,
+    mainPoster: fullData.poster_path ? `https://image.tmdb.org/t/p/w500${fullData.poster_path}` : null,
+    mainBackdrop: fullData.backdrop_path ? `https://image.tmdb.org/t/p/w1280${fullData.backdrop_path}` : null,
+    alternativePosters: fullData.images?.posters?.slice(0, 5).map(p => `https://image.tmdb.org/t/p/w500${p.file_path}`) || [],
+    alternativeBackdrops: fullData.images?.backdrops?.slice(0, 5).map(b => `https://image.tmdb.org/t/p/w1280${b.file_path}`) || []
+  };
+} else {
+  fullData = await fetch(`https://api.themoviedb.org/3/movie/${mediaId}?api_key=${TMDB_API_KEY}&append_to_response=credits,images`).then(res => res.json());
+  
+  movieData = {
+    title: fullData.title,
+    year: fullData.release_date ? fullData.release_date.substring(0, 4) : '',
+    username,
+    tags,
+    rating,
+    isLiked: false,
+    watchedDate: watchedDate || null,
+    movie: fullData,
+    details: fullData,
+    credits: fullData.credits,
+    images: fullData.images,
+    isCustomMode: true,
+    mainPoster: fullData.poster_path ? `https://image.tmdb.org/t/p/w500${fullData.poster_path}` : null,
+    mainBackdrop: fullData.backdrop_path ? `https://image.tmdb.org/t/p/w1280${fullData.backdrop_path}` : null,
+    alternativePosters: fullData.images?.posters?.slice(0, 5).map(p => `https://image.tmdb.org/t/p/w500${p.file_path}`) || [],
+    alternativeBackdrops: fullData.images?.backdrops?.slice(0, 5).map(b => `https://image.tmdb.org/t/p/w1280${b.file_path}`) || []
+  };
+}
     }
 
     // Generate a unique session ID and store the movie data
