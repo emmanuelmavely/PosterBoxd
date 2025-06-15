@@ -177,21 +177,38 @@ async function generatePosterImage(movieData, settings, selectedPosterIndex = 0,
   const actors = credits.cast?.slice(0, 3).map(c => c.name) || [];
   const runtime = details.runtime ? formatRuntime(details.runtime) : null;
 
+  // TV series enhancements
+  const isTV = movieData.movie && (movieData.movie.first_air_date || movieData.movie.number_of_seasons);
+  const createdBy = details.created_by?.map(c => c.name).join(', ') || '';
+  const firstYear = details.first_air_date ? details.first_air_date.substring(0, 4) : '';
+  const lastYear = details.last_air_date ? details.last_air_date.substring(0, 4) : '';
+  const yearRange = firstYear && lastYear && firstYear !== lastYear ? `${firstYear}–${lastYear}` : firstYear || year;
+  const numSeasons = details.number_of_seasons;
+  const numEpisodes = details.number_of_episodes;
+  const seasonInfo = (numSeasons && numEpisodes)
+    ? `${numSeasons} season${numSeasons > 1 ? 's' : ''}, ${numEpisodes} episode${numEpisodes > 1 ? 's' : ''}`
+    : '';
+
   for (const key of contentOrder) {
     if (key === 'title' && settings.showTitle) addWrappedLine(title, 'title', 36);
-    else if (key === 'year' && settings.showYear && year) addWrappedLine(year, 'year');
-    else if (key === 'genre' && settings.showGenre && genre.length) addWrappedLine(genre.join(' | '), 'genre');
-    else if (key === 'director' && settings.showDirector && director) {
+    else if (key === 'year' && settings.showYear && (yearRange || year)) addWrappedLine(yearRange, 'year');
+    else if (key === 'genre' && settings.showGenre && genre.length && !isTV) addWrappedLine(genre.join(' | '), 'genre');
+    else if (key === 'genre' && settings.showGenre && isTV && seasonInfo) addWrappedLine(seasonInfo, 'genre');
+    else if (key === 'director' && settings.showDirector && !isTV && director) {
       svgParts.push(`<text x="${width / 2}" y="${currentY}" text-anchor="middle" class="label">directed by <tspan font-weight="bold">${escapeXml(director)}</tspan></text>`);
       currentY += lineHeight;
-    } else if (key === 'runtime' && settings.showRuntime && runtime) addWrappedLine(runtime, 'label');
+    } else if (key === 'director' && settings.showDirector && isTV && createdBy) {
+      svgParts.push(`<text x="${width / 2}" y="${currentY}" text-anchor="middle" class="label">created by <tspan font-weight="bold">${escapeXml(createdBy)}</tspan></text>`);
+      currentY += lineHeight;
+    } else if (key === 'runtime' && settings.showRuntime && runtime && !isTV) addWrappedLine(runtime, 'label');
+    else if (key === 'runtime' && settings.showRuntime && isTV && seasonInfo) addWrappedLine(seasonInfo, 'label');
     else if (key === 'music' && settings.showMusic && musicDirector) {
       svgParts.push(`<text x="${width / 2}" y="${currentY}" text-anchor="middle" class="label">music by <tspan font-weight="bold">${escapeXml(musicDirector)}</tspan></text>`);
       currentY += lineHeight;
     } else if (key === 'actors' && settings.showActors && actors.length) addWrappedLine(actors.join(', '), 'actors', 60);
-    else if (key === 'rating' && settings.showRating && (rating || isLiked)) {
+    else if (key === 'rating' && settings.showRating && (rating || (isLiked && settings.showHeart))) {
       currentY += Math.round(lineHeight / 2);
-      
+
       // Show rating stars if available
       if (rating) {
         const full = Math.floor(rating), half = rating % 1 >= 0.5, empty = 5 - full - (half ? 1 : 0);
@@ -199,13 +216,13 @@ async function generatePosterImage(movieData, settings, selectedPosterIndex = 0,
         svgParts.push(`<text x="${width / 2}" y="${currentY}" text-anchor="middle" class="stars">${stars}</text>`);
         currentY += lineHeight;
       }
-      
-      // Show heart if liked
-      if (isLiked) {
+
+      // Show heart if liked AND showHeart is checked
+      if (isLiked && settings.showHeart) {
         svgParts.push(`<text x="${width / 2}" y="${currentY}" text-anchor="middle" class="heart">♥</text>`);
         currentY += lineHeight;
       }
-      
+
       currentY += betweenSections - lineHeight;
     } else if (key === 'tags' && settings.showTags && tags.length) {
       wrapText(tags.map(t => `#${t}`).join(' '), 60).forEach(line => {

@@ -157,6 +157,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let currentSessionId = null;
     let currentSettings = null;
+    let selectedPosterIndex = 0;
+    let selectedBackgroundIndex = 0;
 
     // Function to create option items
     function createOptionItem(src, type, index, isActive = false) {
@@ -179,7 +181,14 @@ document.addEventListener('DOMContentLoaded', () => {
         item.classList.add('no-image');
       }
       
-      item.addEventListener('click', () => regenerateWithOption(type, index));
+      item.addEventListener('click', () => {
+        if (type === 'poster') {
+          selectedPosterIndex = index;
+        } else if (type === 'background') {
+          selectedBackgroundIndex = index;
+        }
+        regenerateWithOption();
+      });
       return item;
     }
 
@@ -192,32 +201,32 @@ document.addEventListener('DOMContentLoaded', () => {
       // Add poster options (main poster + alternatives)
       const posters = [movieData.mainPoster, ...(movieData.alternativePosters || [])];
       posters.forEach((poster, index) => {
-        const item = createOptionItem(poster, 'poster', index, index === 0);
+        const item = createOptionItem(poster, 'poster', index, index === selectedPosterIndex);
         posterOptions.appendChild(item);
       });
-      
+
       // Add background options (main backdrop + alternatives)
       const backgrounds = [movieData.mainBackdrop, ...(movieData.alternativeBackdrops || [])];
       backgrounds.forEach((background, index) => {
-        const item = createOptionItem(background, 'background', index, index === 0);
+        const item = createOptionItem(background, 'background', index, index === selectedBackgroundIndex);
         backgroundOptions.appendChild(item);
       });
     }
 
-    // Function to regenerate image with selected option
-    async function regenerateWithOption(type, index) {
+    // Function to regenerate image with selected options
+    async function regenerateWithOption() {
       if (!currentSessionId || !currentSettings) return;
-      
+
       overlay.classList.add('show');
-      
+
       try {
         const requestData = {
           sessionId: currentSessionId,
-          selectedPosterIndex: type === 'poster' ? index : 0,
-          selectedBackgroundIndex: type === 'background' ? index : 0,
+          selectedPosterIndex,
+          selectedBackgroundIndex,
           settings: currentSettings
         };
-        
+
         const res = await fetch('/regenerate-image', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -232,15 +241,14 @@ document.addEventListener('DOMContentLoaded', () => {
         const blob = await res.blob();
         const url = URL.createObjectURL(blob);
         generatedImage.src = url;
-        
+
         // Update active states
         document.querySelectorAll('.option-item').forEach(item => item.classList.remove('active'));
-        document.querySelectorAll(`[data-type="${type}"][data-index="${index}"]`).forEach(item => {
-          item.classList.add('active');
-        });
-        
+        document.querySelectorAll(`[data-type="poster"][data-index="${selectedPosterIndex}"]`).forEach(item => item.classList.add('active'));
+        document.querySelectorAll(`[data-type="background"][data-index="${selectedBackgroundIndex}"]`).forEach(item => item.classList.add('active'));
+
         overlay.classList.remove('show');
-        
+
         // Update button handlers
         copyButton.onclick = async () => {
           await navigator.clipboard.write([new ClipboardItem({ 'image/jpeg': blob })]);
@@ -253,7 +261,7 @@ document.addEventListener('DOMContentLoaded', () => {
           a.download = 'letterboxd-poster.jpg';
           a.click();
         };
-        
+
       } catch (err) {
         alert('Error: ' + err.message);
         overlay.classList.remove('show');
