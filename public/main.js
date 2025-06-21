@@ -184,13 +184,19 @@ document.addEventListener('DOMContentLoaded', () => {
     const posterOptions = document.getElementById('poster-options');
     const backgroundOptions = document.getElementById('background-options');
     const logoOptions = document.getElementById('logo-options');
-    const logoSelectionSection = document.getElementById('logo-selection-section');
-
-    let currentSessionId = null;
+    const logoSelectionSection = document.getElementById('logo-selection-section');    let currentSessionId = null;
     let currentSettings = null;
     let selectedPosterIndex = 0;
     let selectedBackgroundIndex = 0;
     let selectedLogoIndex = 0; // Add selected logo index variable
+
+    // Function to reset selection indices for experimental mode
+    function resetSelectionForExperimental() {
+      if (posterStyleSelect.value === 'experimental') {
+        selectedPosterIndex = -1; // No poster selected by default
+        selectedBackgroundIndex = 0; // First background selected by default
+      }
+    }
 
     // Poster Style dropdown
     const posterStyleSelect = document.getElementById('poster-style-select');
@@ -228,9 +234,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('classic-metadata-options').style.display = 'block';
         document.getElementById('experimental-metadata-options').style.display = 'none';
       }
-    });
-
-    // Function to create option items
+    });    // Function to create option items
     function createOptionItem(src, type, index, isActive = false) {
       const item = document.createElement('div');
       item.className = `option-item ${isActive ? 'active' : ''}`;
@@ -252,12 +256,24 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       
       item.addEventListener('click', () => {
-        if (type === 'poster') {
+        // In experimental mode, handle poster/background selection logic
+        if (posterStyleSelect.value === 'experimental' && type === 'poster') {
+          // Reset background selection when poster is selected
+          selectedBackgroundIndex = -1;
           selectedPosterIndex = index;
-        } else if (type === 'background') {
+        } else if (posterStyleSelect.value === 'experimental' && type === 'background') {
+          // Reset poster selection when background is selected
+          selectedPosterIndex = -1;
           selectedBackgroundIndex = index;
-        } else if (type === 'logo') {
-          selectedLogoIndex = index;
+        } else {
+          // Classic mode - normal selection
+          if (type === 'poster') {
+            selectedPosterIndex = index;
+          } else if (type === 'background') {
+            selectedBackgroundIndex = index;
+          } else if (type === 'logo') {
+            selectedLogoIndex = index;
+          }
         }
         regenerateWithOption();
       });
@@ -279,35 +295,50 @@ document.addEventListener('DOMContentLoaded', () => {
       logoOptions.innerHTML = '';
       
       // Hide logo section by default
-      logoSelectionSection.style.display = 'none';
-
-      // Experimental mode: handle logos and other options
+      logoSelectionSection.style.display = 'none';      // Experimental mode: handle logos and other options
       if (posterStyleSelect.value === 'experimental') {
-        // Hide poster section
-        posterOptionsSection.parentElement.style.display = 'none';
+        // Show poster section for experimental mode (posters will be used as backgrounds)
+        posterOptionsSection.parentElement.style.display = '';        // Add poster options (main poster + alternatives) - these will be used as backgrounds
+        const posterList = [movieData.mainPoster, ...(movieData.alternativePosters || [])];
+        posterList.forEach((poster, index) => {
+          const item = createOptionItem(poster, 'poster', index, false); // Never active by default in experimental
+          posterOptionsDiv.appendChild(item);
+        });
 
         // Show logos if available (for experimental mode)
         if (movieData.alternativeLogos && movieData.alternativeLogos.length > 0) {
           logoSelectionSection.style.display = ''; // Show the section
           
+          // Find English logo index for default selection (prioritize English)
+          let defaultLogoIndex = 0;
+          const englishLogoIndex = movieData.alternativeLogos.findIndex(logo => logo.language === 'en');
+          if (englishLogoIndex !== -1) {
+            defaultLogoIndex = englishLogoIndex;
+            selectedLogoIndex = englishLogoIndex;
+            console.log(`🎯 Using English logo as default (index ${englishLogoIndex})`);
+          } else {
+            console.log(`⚠️ No English logo found, using first available (index 0)`);
+          }
+          
           // Add logo options
           movieData.alternativeLogos.forEach((logo, index) => {
-            const item = createOptionItem(logo.url, 'logo', index, index === selectedLogoIndex);
+            const item = createOptionItem(logo.url, 'logo', index, index === defaultLogoIndex);
             logoOptions.appendChild(item);
           });
-        }
-
-        // Combine all backdrops and posters for background selection
+        }        // Combine all backdrops and posters for background selection
         let backgrounds = [];
         // Use sorted backdrops from backend (already sorted by quality)
         if (movieData.alternativeBackdrops && movieData.alternativeBackdrops.length > 0) {
           backgrounds = backgrounds.concat(movieData.alternativeBackdrops);
-        }
-        // Add all posters as additional backgrounds (avoid duplicates)
-        const posters = [movieData.mainPoster, ...(movieData.alternativePosters || [])].filter(Boolean);
-        posters.forEach(poster => {
-          if (poster && !backgrounds.includes(poster)) backgrounds.push(poster);
+        }        // Add all posters as additional backgrounds (use w1280 for consistency, avoid duplicates)
+        const posterBackgrounds = [movieData.mainPoster, ...(movieData.alternativePosters || [])].filter(Boolean);
+        posterBackgrounds.forEach(poster => {
+          // Convert poster URLs to w1280 for consistency with backdrops
+          const posterUrl = poster.replace('/w500/', '/w1280/');
+          if (!backgrounds.includes(posterUrl)) backgrounds.push(posterUrl);
         });
+
+        console.log(`🎨 [Experimental Menu] Preparing ${backgrounds.length} background options (backdrops + posters)`);
 
         backgrounds.forEach((background, index) => {
           const item = createOptionItem(background, 'background', index, index === selectedBackgroundIndex);
@@ -334,9 +365,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         backgroundSection.style.display = '';
       }
-    }
-
-    // Function to regenerate image with selected options
+    }    // Function to regenerate image with selected options
     async function regenerateWithOption() {
       if (!currentSessionId || !currentSettings) return;
 
@@ -366,10 +395,22 @@ document.addEventListener('DOMContentLoaded', () => {
         const url = URL.createObjectURL(blob);
         generatedImage.src = url;
 
-        // Update active states for all option types
+        // Update active states for all option types - but handle experimental mode specially
         document.querySelectorAll('.option-item').forEach(item => item.classList.remove('active'));
-        document.querySelectorAll(`[data-type="poster"][data-index="${selectedPosterIndex}"]`).forEach(item => item.classList.add('active'));
-        document.querySelectorAll(`[data-type="background"][data-index="${selectedBackgroundIndex}"]`).forEach(item => item.classList.add('active'));
+          // In experimental mode, only show active state for the option that's actually being used
+        if (posterStyleSelect.value === 'experimental') {
+          // In experimental, poster selection takes priority for background
+          if (selectedPosterIndex >= 0) {
+            document.querySelectorAll(`[data-type="poster"][data-index="${selectedPosterIndex}"]`).forEach(item => item.classList.add('active'));
+          } else if (selectedBackgroundIndex >= 0) {
+            document.querySelectorAll(`[data-type="background"][data-index="${selectedBackgroundIndex}"]`).forEach(item => item.classList.add('active'));
+          }
+        } else {
+          // Classic mode - show both poster and background selections
+          document.querySelectorAll(`[data-type="poster"][data-index="${selectedPosterIndex}"]`).forEach(item => item.classList.add('active'));
+          document.querySelectorAll(`[data-type="background"][data-index="${selectedBackgroundIndex}"]`).forEach(item => item.classList.add('active'));
+        }
+        
         document.querySelectorAll(`[data-type="logo"][data-index="${selectedLogoIndex}"]`).forEach(item => item.classList.add('active'));
 
         overlay.classList.remove('show');
@@ -502,22 +543,17 @@ document.addEventListener('DOMContentLoaded', () => {
           logoAlignment: document.getElementById('logo-alignment')?.value || 'left',
           logoScale: parseFloat(document.getElementById('logo-scale')?.value || 1.0)
         }
-      };
-
-      currentSettings = settings;
-
-      try {
-        console.log('Sending request with data:', {
-          ...requestData,
-          settings
-        });
-        
+      };      currentSettings = settings;      try {
         const res = await fetch('/generate-image', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             ...requestData,
-            settings
+            settings,
+            // Pass initial selection indices for experimental mode
+            selectedPosterIndex: settings.posterStyle === 'experimental' ? -1 : 0,
+            selectedBackgroundIndex: 0,
+            selectedLogoIndex: 0
           })
         });
 
@@ -527,7 +563,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         const responseData = await res.json();
-        console.log('Received response:', responseData);
         
         const blob = new Blob([new Uint8Array(responseData.imageBuffer.data)], { type: 'image/jpeg' });
         const url = URL.createObjectURL(blob);
@@ -535,9 +570,12 @@ document.addEventListener('DOMContentLoaded', () => {
         generatedImage.src = url;
         result.style.display = 'block';
         overlay.classList.remove('show');
-        
-        // Store session ID and populate menu
+          // Store session ID and populate menu
         currentSessionId = responseData.sessionId;
+        
+        // Reset selection for experimental mode
+        resetSelectionForExperimental();
+        
         populateMenuOptions(responseData.movieData);
 
         copyButton.onclick = async () => {

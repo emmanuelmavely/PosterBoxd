@@ -195,10 +195,22 @@ async function generateExperimentalPoster(movieData, settings, selectedPosterInd
   posters.forEach(p => {
     const posterUrl = `https://image.tmdb.org/t/p/w500${p}`;
     if (!backgrounds.includes(posterUrl)) backgrounds.push(posterUrl);
-  });
-
-  // Use selected background (from combined list)
-  const selectedBackground = backgrounds[selectedBackgroundIndex] || backgrounds[0];
+  });  // Handle poster selection in experimental mode - if a poster is selected, use it as background
+  let selectedBackground;
+  if (selectedPosterIndex !== undefined && selectedPosterIndex >= 0 && selectedPosterIndex !== -1) {
+    // Get the poster list for selection (includes main + alternatives)
+    const allPosters = [movie.poster_path, ...(images.posters?.slice(0, 5).map(p => p.file_path) || [])].filter(Boolean);
+    if (selectedPosterIndex < allPosters.length) {
+      selectedBackground = `https://image.tmdb.org/t/p/w1280${allPosters[selectedPosterIndex]}`;
+      console.log(`🎨 [Experimental] Using selected poster as background (index ${selectedPosterIndex})`);
+    } else {
+      selectedBackground = backgrounds[selectedBackgroundIndex] || backgrounds[0];
+      console.log(`🎨 [Experimental] Poster index out of range, using background (index ${selectedBackgroundIndex})`);
+    }
+  } else {
+    selectedBackground = backgrounds[selectedBackgroundIndex] || backgrounds[0];
+    console.log(`🎨 [Experimental] Using selected background (index ${selectedBackgroundIndex})`);
+  }
 
   // Prepare base image
   let baseImage = selectedBackground
@@ -225,73 +237,75 @@ async function generateExperimentalPoster(movieData, settings, selectedPosterInd
 
   // SVG content
   let svgContent = '';
-
   // --- Title logo from TMDB if available ---
   let logoPlaced = false;
   if (images && images.logos && images.logos.length > 0) {
-    // Log the available logos for debugging
-    console.log('[PosterBoxd] Available logos:', images.logos.map(l => ({
-      iso: l.iso_639_1,
-      width: l.width,
-      height: l.height,
-      aspect: l.aspect_ratio,
-      path: l.file_path
-    })));
+    console.log(`🎨 [Logo Processing] Found ${images.logos.length} available logo(s):`);
+    images.logos.forEach((logo, index) => {
+      console.log(`   ${index}: ${logo.iso_639_1 || 'null'} | ${logo.width}x${logo.height} | ${logo.file_path}`);
+    });
     
-    // Define logoSizes array - this was missing and causing the error
     const logoSizes = ['w500', 'original', 'w300'];
     
-    // Use the selected logo if valid, otherwise default to English or first
-    const logoObj = images.logos[selectedLogoIndex] || 
-                   images.logos.find(l => l.iso_639_1 === 'en') || 
-                   images.logos[0];
+    // Default to English logo first, then use selected index, then fallback to first available
+    let logoObj;
+    if (selectedLogoIndex === 0) {
+      // If no specific selection, prefer English
+      logoObj = images.logos.find(l => l.iso_639_1 === 'en') || images.logos[0];
+      const englishIndex = images.logos.findIndex(l => l.iso_639_1 === 'en');
+      if (englishIndex !== -1) {
+        console.log(`✅ [Logo] Using English logo (index ${englishIndex})`);
+      } else {
+        console.log(`⚠️  [Logo] No English logo found, using first available (index 0)`);
+      }
+    } else {
+      logoObj = images.logos[selectedLogoIndex] || images.logos[0];
+      console.log(`🎯 [Logo] Using selected logo (index ${selectedLogoIndex}): ${logoObj.iso_639_1 || 'null'}`);
+    }
     
     if (logoObj && logoObj.file_path) {
-      // Try each size until one works
+      console.log(`🔄 [Logo] Attempting to fetch logo: ${logoObj.iso_639_1 || 'null'} (${logoObj.width}x${logoObj.height})`);
+      
       for (const size of logoSizes) {
         try {
           const logoUrl = `https://image.tmdb.org/t/p/${size}${logoObj.file_path}`;
-          console.log(`[PosterBoxd] Trying logo URL: ${logoUrl}`);
-          
           const logoResp = await fetch(logoUrl);
+          
           if (!logoResp.ok) {
-            console.log(`[PosterBoxd] Logo fetch failed with status: ${logoResp.status}`);
+            console.log(`   ❌ Size ${size}: HTTP ${logoResp.status}`);
             continue;
           }
           
           const contentType = logoResp.headers.get('content-type');
-          console.log(`[PosterBoxd] Logo content type: ${contentType}`);
-          
           const arrBuf = await logoResp.arrayBuffer();
           const logoBuffer = Buffer.from(arrBuf);
           
-          console.log(`[PosterBoxd] Logo buffer length: ${logoBuffer.length} bytes`);
-          
-          // Minimum reasonable size for an image (1KB)
           if (logoBuffer.length > 1024) {
             const logoDataUrl = `data:${contentType || 'image/png'};base64,${logoBuffer.toString('base64')}`;
-            // Apply logo alignment (left or center)
             const logoX = settings.experimentalSettings?.logoAlignment === 'center' ? (width - logoW) / 2 : leftX;
+            
             svgContent += `<image x="${logoX}" y="${y}" width="${logoW}" height="${logoH}" xlink:href="${logoDataUrl}" preserveAspectRatio="xMinYMid meet" />`;
             y += logoH + titleCrewGap;
             logoPlaced = true;
-            console.log(`[PosterBoxd] Logo placed successfully from ${size}`);
+            
+            console.log(`   ✅ Size ${size}: Success (${Math.round(logoBuffer.length/1024)}KB, ${contentType})`);
+            console.log(`🎨 [Logo] Placed successfully at (${logoX}, ${y-logoH-titleCrewGap}) with ${settings.experimentalSettings?.logoAlignment || 'left'} alignment`);
             break;
           } else {
-            console.log(`[PosterBoxd] Logo too small (${logoBuffer.length} bytes), trying next size`);
+            console.log(`   ⚠️  Size ${size}: Too small (${logoBuffer.length} bytes)`);
           }
         } catch (e) {
-          console.error(`[PosterBoxd] Error fetching logo with size ${size}:`, e);
+          console.log(`   ❌ Size ${size}: ${e.message}`);
         }
       }
     }
   }
   
   if (!logoPlaced) {
-    console.log('[PosterBoxd] Using fallback text title');
+    console.log(`📝 [Logo] Using text fallback: "${movieData.title}"`);
     const year = movieData.year ? ` <tspan class="title-year">(${escapeXml(movieData.year)})</tspan>` : '';
     svgContent += `<text x="${leftX}" y="${y}" class="logo-title" text-anchor="start">${escapeXml(movieData.title)}${year}</text>`;
-    y += 80 + titleCrewGap; // Also update spacing for text title fallback
+    y += 80 + titleCrewGap;
   }
 
   // Crew credits (grouped by role, names bold, left-aligned, char limit)
@@ -590,7 +604,7 @@ app.post('/generate-image', async (req, res) => {
   try {
     console.log('Received request with body:', JSON.stringify(req.body, null, 2));
     
-    const { mode, settings = {} } = req.body;
+    const { mode, settings = {}, selectedPosterIndex = 0, selectedBackgroundIndex = 0, selectedLogoIndex = 0 } = req.body;
     let movieData;
 
     if (mode === 'letterboxd') {
@@ -636,9 +650,7 @@ app.post('/generate-image', async (req, res) => {
       console.log('📅 Watched on:', watchedDate);
       console.log('❤️ Liked:', isLiked);
 
-      const { movie, details, credits, images } = await fetchTmdbData(title, year, directorText);
-
-      movieData = {
+      const { movie, details, credits, images } = await fetchTmdbData(title, year, directorText);      movieData = {
         title,
         year,
         username,
@@ -656,6 +668,34 @@ app.post('/generate-image', async (req, res) => {
         alternativePosters: images.posters?.slice(0, 5).map(p => `https://image.tmdb.org/t/p/w500${p.file_path}`) || [],
         alternativeBackdrops: images.backdrops?.slice(0, 5).map(b => `https://image.tmdb.org/t/p/w1280${b.file_path}`) || []
       };
+
+      // Log poster information
+      console.log(`🖼️ [Posters] Main poster: ${movie.poster_path ? 'Available' : 'None'}`);
+      if (movie.poster_path) {
+        console.log(`   Main: w500${movie.poster_path}`);
+      }
+      if (images.posters && images.posters.length > 0) {
+        console.log(`🖼️ [Posters] Found ${images.posters.length} alternative poster(s):`);
+        images.posters.slice(0, 5).forEach((poster, index) => {
+          console.log(`   ${index + 1}: ${poster.iso_639_1 || 'null'} | ${poster.width}x${poster.height} | w500${poster.file_path}`);
+        });
+      } else {
+        console.log(`🖼️ [Posters] No alternative posters available`);
+      }
+
+      // Log backdrop information
+      console.log(`🌄 [Backdrops] Main backdrop: ${movie.backdrop_path ? 'Available' : 'None'}`);
+      if (movie.backdrop_path) {
+        console.log(`   Main: w1280${movie.backdrop_path}`);
+      }
+      if (images.backdrops && images.backdrops.length > 0) {
+        console.log(`🌄 [Backdrops] Found ${images.backdrops.length} alternative backdrop(s):`);
+        images.backdrops.slice(0, 5).forEach((backdrop, index) => {
+          console.log(`   ${index + 1}: ${backdrop.iso_639_1 || 'null'} | ${backdrop.width}x${backdrop.height} | w1280${backdrop.file_path}`);
+        });
+      } else {
+        console.log(`🌄 [Backdrops] No alternative backdrops available`);
+      }
       
     } else {
       // Custom mode
@@ -666,8 +706,7 @@ app.post('/generate-image', async (req, res) => {
         mediaData = await fetch(`https://api.themoviedb.org/3/tv/${mediaId}?api_key=${TMDB_API_KEY}`).then(res => res.json());
         const credits = await fetch(`https://api.themoviedb.org/3/tv/${mediaId}/credits?api_key=${TMDB_API_KEY}`).then(res => res.json());
         const images = await fetch(`https://api.themoviedb.org/3/tv/${mediaId}/images?api_key=${TMDB_API_KEY}`).then(res => res.json());
-        
-        movieData = {
+          movieData = {
           title: mediaData.name,
           year: mediaData.first_air_date ? mediaData.first_air_date.substring(0, 4) : '',
           username,
@@ -685,12 +724,39 @@ app.post('/generate-image', async (req, res) => {
           alternativePosters: images.posters?.slice(0, 5).map(p => `https://image.tmdb.org/t/p/w500${p.file_path}`) || [],
           alternativeBackdrops: images.backdrops?.slice(0, 5).map(b => `https://image.tmdb.org/t/p/w1280${b.file_path}`) || []
         };
+
+        // Log poster information for TV series
+        console.log(`📺 [TV Posters] Main poster: ${mediaData.poster_path ? 'Available' : 'None'}`);
+        if (mediaData.poster_path) {
+          console.log(`   Main: w500${mediaData.poster_path}`);
+        }
+        if (images.posters && images.posters.length > 0) {
+          console.log(`📺 [TV Posters] Found ${images.posters.length} alternative poster(s):`);
+          images.posters.slice(0, 5).forEach((poster, index) => {
+            console.log(`   ${index + 1}: ${poster.iso_639_1 || 'null'} | ${poster.width}x${poster.height} | w500${poster.file_path}`);
+          });
+        } else {
+          console.log(`📺 [TV Posters] No alternative posters available`);
+        }
+
+        // Log backdrop information for TV series
+        console.log(`🌄 [TV Backdrops] Main backdrop: ${mediaData.backdrop_path ? 'Available' : 'None'}`);
+        if (mediaData.backdrop_path) {
+          console.log(`   Main: w1280${mediaData.backdrop_path}`);
+        }
+        if (images.backdrops && images.backdrops.length > 0) {
+          console.log(`🌄 [TV Backdrops] Found ${images.backdrops.length} alternative backdrop(s):`);
+          images.backdrops.slice(0, 5).forEach((backdrop, index) => {
+            console.log(`   ${index + 1}: ${backdrop.iso_639_1 || 'null'} | ${backdrop.width}x${backdrop.height} | w1280${backdrop.file_path}`);
+          });
+        } else {
+          console.log(`🌄 [TV Backdrops] No alternative backdrops available`);
+        }
       } else {
         const movie = await fetch(`https://api.themoviedb.org/3/movie/${mediaId}?api_key=${TMDB_API_KEY}`).then(res => res.json());
         const credits = await fetch(`https://api.themoviedb.org/3/movie/${mediaId}/credits?api_key=${TMDB_API_KEY}`).then(res => res.json());
         const images = await fetch(`https://api.themoviedb.org/3/movie/${mediaId}/images?api_key=${TMDB_API_KEY}`).then(res => res.json());
-        
-        movieData = {
+          movieData = {
           title: movie.title,
           year: movie.release_date ? movie.release_date.substring(0, 4) : '',
           username,
@@ -708,6 +774,34 @@ app.post('/generate-image', async (req, res) => {
           alternativePosters: images.posters?.slice(0, 5).map(p => `https://image.tmdb.org/t/p/w500${p.file_path}`) || [],
           alternativeBackdrops: images.backdrops?.slice(0, 5).map(b => `https://image.tmdb.org/t/p/w1280${b.file_path}`) || []
         };
+
+        // Log poster information for movies
+        console.log(`🎬 [Movie Posters] Main poster: ${movie.poster_path ? 'Available' : 'None'}`);
+        if (movie.poster_path) {
+          console.log(`   Main: w500${movie.poster_path}`);
+        }
+        if (images.posters && images.posters.length > 0) {
+          console.log(`🎬 [Movie Posters] Found ${images.posters.length} alternative poster(s):`);
+          images.posters.slice(0, 5).forEach((poster, index) => {
+            console.log(`   ${index + 1}: ${poster.iso_639_1 || 'null'} | ${poster.width}x${poster.height} | w500${poster.file_path}`);
+          });
+        } else {
+          console.log(`🎬 [Movie Posters] No alternative posters available`);
+        }
+
+        // Log backdrop information for movies
+        console.log(`🌄 [Movie Backdrops] Main backdrop: ${movie.backdrop_path ? 'Available' : 'None'}`);
+        if (movie.backdrop_path) {
+          console.log(`   Main: w1280${movie.backdrop_path}`);
+        }
+        if (images.backdrops && images.backdrops.length > 0) {
+          console.log(`🌄 [Movie Backdrops] Found ${images.backdrops.length} alternative backdrop(s):`);
+          images.backdrops.slice(0, 5).forEach((backdrop, index) => {
+            console.log(`   ${index + 1}: ${backdrop.iso_639_1 || 'null'} | ${backdrop.width}x${backdrop.height} | w1280${backdrop.file_path}`);
+          });
+        } else {
+          console.log(`🌄 [Movie Backdrops] No alternative backdrops available`);
+        }
       }
     }
 
@@ -721,33 +815,40 @@ app.post('/generate-image', async (req, res) => {
       movieDataStore.delete(firstKey);
     }
 
-    const finalBuffer = await generatePosterImage(movieData, settings);
-    
-    // After movieData is set, add logos to the response for the frontend
+    const finalBuffer = await generatePosterImage(movieData, settings, selectedPosterIndex, selectedBackgroundIndex, selectedLogoIndex);
+      // After movieData is set, add logos to the response for the frontend
     let alternativeLogos = [];
     if (settings.posterStyle === 'experimental' && movieData.images && movieData.images.logos) {
-      alternativeLogos = movieData.images.logos.map(logo => ({
-        url: `https://image.tmdb.org/t/p/w500${logo.file_path}`,
-        language: logo.iso_639_1,
-        width: logo.width,
-        height: logo.height
-      }));
+      console.log(`🖼️ [Logos] Processing ${movieData.images.logos.length} logo(s) for frontend:`);
+      alternativeLogos = movieData.images.logos.map((logo, index) => {
+        console.log(`   ${index}: ${logo.iso_639_1 || 'null'} | ${logo.width}x${logo.height} | w500${logo.file_path}`);
+        return {
+          url: `https://image.tmdb.org/t/p/w500${logo.file_path}`,
+          language: logo.iso_639_1,
+          width: logo.width,
+          height: logo.height
+        };
+      });
     }
 
     // Fix: Create a properly scoped variable for alternativeBackdrops
     let alternativeBackdrops = movieData.alternativeBackdrops || [];
-    
-    // For experimental, send all backdrops + posters as backgrounds
+      // For experimental, send all backdrops + posters as backgrounds
     if (settings.posterStyle === 'experimental' && movieData.images) {
       const sorted = sortBackdropsByQuality(movieData.images.backdrops || []);
       let backgrounds = sorted.map(b => `https://image.tmdb.org/t/p/w1280${b.file_path}`);
+      
+      // Add posters as background options (use w1280 for consistency with backdrops)
       const posters = [movieData.movie.poster_path, ...(movieData.images.posters?.slice(0, 5).map(p => p.file_path) || [])].filter(Boolean);
       posters.forEach(p => {
-        const posterUrl = `https://image.tmdb.org/t/p/w500${p}`;
+        const posterUrl = `https://image.tmdb.org/t/p/w1280${p}`;
         if (!backgrounds.includes(posterUrl)) backgrounds.push(posterUrl);
       });
+      
       alternativeBackdrops = backgrounds;
       movieData.alternativeBackdrops = backgrounds;
+        console.log(`🎨 [Experimental Backgrounds] Combined ${sorted.length} backdrop(s) + ${posters.length} poster(s) = ${backgrounds.length} total background options`);
+      console.log(`🖼️ [Experimental Posters] Available for background use: ${posters.length} poster(s)`);
     }
 
     console.log('Processing completed, sending response');
