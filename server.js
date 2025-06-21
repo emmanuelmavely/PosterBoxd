@@ -598,10 +598,16 @@ app.post('/generate-image', async (req, res) => {
       const { letterboxdUrl } = req.body;
       const response = await fetch(letterboxdUrl);
       const html = await response.text();
-      const $ = cheerio.load(html);
-
-      const title = $('.film-title-wrapper a').first().text().trim();
-      const year = $('.film-title-wrapper .metadata a').first().text().trim();
+      const $ = cheerio.load(html);      // Try new structure first (2025 format)
+      let title = $('.inline-production-masthead .name a').first().text().trim();
+      let year = $('.inline-production-masthead .releasedate a').first().text().trim();
+      
+      // Fallback to old structure if new structure not found
+      if (!title) {
+        title = $('.film-title-wrapper a').first().text().trim();
+        year = $('.film-title-wrapper .metadata a').first().text().trim();
+      }
+      
       const directorText = $('a[href*="/director/"]').first().text().trim();
       const username = $('.person-summary .name span').first().text().trim();
       const tags = $('ul.tags li a').map((_, el) => $(el).text().trim()).get();
