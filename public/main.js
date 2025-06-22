@@ -78,15 +78,14 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Initialize
-    updateStarsDisplay(ratingSlider.value);
-
-    // Search functionality
+    updateStarsDisplay(ratingSlider.value);    // Search functionality
     const searchButton = document.getElementById('search-button');
     const customTitle = document.getElementById('custom-title');
     const searchResults = document.getElementById('search-results');
     const customFields = document.getElementById('custom-fields');
     
-    searchButton.addEventListener('click', async () => {
+    // Function to perform search
+    const performSearch = async () => {
       const query = customTitle.value.trim();
       if (!query) return;
       
@@ -105,42 +104,109 @@ document.addEventListener('DOMContentLoaded', () => {
       } catch (error) {
         searchResults.innerHTML = '<div style="padding: 1rem; text-align: center; color: #ff3b30;">Search failed. Please try again.</div>';
       }
-    });
+    };
     
-    function displaySearchResults(results) {
+    // Add click event to search button
+    searchButton.addEventListener('click', performSearch);
+    
+    // Add Enter key support to search input
+    customTitle.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        performSearch();
+      }
+    });    function displaySearchResults(results) {
       if (!results || results.length === 0) {
         searchResults.innerHTML = '<div style="padding: 1rem; text-align: center;">No results found</div>';
         return;
       }
       
-      searchResults.innerHTML = results.map(item => `
-        <div class="search-result-item" data-id="${item.id}" data-type="${item.media_type || 'movie'}">
-          ${item.poster_path 
-            ? `<img class="search-result-poster" src="https://image.tmdb.org/t/p/w92${item.poster_path}" alt="${item.title || item.name}">`
-            : '<div class="search-result-poster">No Image</div>'
+      searchResults.innerHTML = results.map(item => {        const title = item.title || item.name;
+        const year = (item.release_date || item.first_air_date) ? `(${(item.release_date || item.first_air_date).substring(0, 4)})` : '';
+        const mediaType = item.media_type === 'tv' ? 'TV Series' : 'Movie';
+        const mediaTypeClass = item.media_type === 'tv' ? 'tv-series' : '';
+        const rating = item.vote_average ? item.vote_average.toFixed(1) : 'N/A';
+        const voteCount = item.vote_count || 0;
+        const overview = item.overview ? item.overview.substring(0, 120) + '...' : 'No description available';          // Director/Creator and Cast info
+        const directorLabel = item.media_type === 'tv' ? 'Created by' : 'Directed by';
+        const directorInfo = item.director ? `<div class="search-result-meta"><strong>${directorLabel}:</strong> ${item.director}</div>` : '';
+        const castInfo = item.cast && item.cast.length > 0 ? `<div class="search-result-meta"><strong>Cast:</strong> ${item.cast.join(', ')}</div>` : '';
+        
+        // Create info tags for both TV series and movies
+        let infoTags = '';
+        if (item.media_type === 'tv') {
+          // TV series tags
+          const tags = [];
+          if (item.number_of_seasons) tags.push(`${item.number_of_seasons} SEASON${item.number_of_seasons > 1 ? 'S' : ''}`);
+          if (item.number_of_episodes) tags.push(`${item.number_of_episodes} EPISODES`);
+          if (item.episode_run_time && item.episode_run_time.length > 0) {
+            const avgRuntime = Math.round(item.episode_run_time.reduce((a, b) => a + b, 0) / item.episode_run_time.length);
+            tags.push(`${avgRuntime}MIN`);
           }
-          <div class="search-result-info">
-            <div class="search-result-title">
-              ${item.title || item.name}
-              <span class="search-result-year">${item.release_date || item.first_air_date ? `(${(item.release_date || item.first_air_date).substring(0, 4)})` : ''}</span>
-              <span class="search-result-type">${item.media_type === 'tv' ? 'TV' : 'Movie'}</span>
+          
+          if (tags.length > 0) {
+            infoTags = `<div class="search-result-tags">${tags.map(tag => `<span class="info-tag tv-tag">${tag}</span>`).join('')}</div>`;
+          }
+        } else {
+          // Movie tags
+          const tags = [];
+          if (item.runtime) {
+            const hours = Math.floor(item.runtime / 60);
+            const minutes = item.runtime % 60;
+            if (hours > 0) {
+              tags.push(`${hours}H ${minutes}M`);
+            } else {
+              tags.push(`${minutes}MIN`);
+            }
+          }
+          
+          if (tags.length > 0) {
+            infoTags = `<div class="search-result-tags">${tags.map(tag => `<span class="info-tag movie-tag">${tag}</span>`).join('')}</div>`;
+          }
+        }
+        
+        return `
+          <div class="search-result-item" data-id="${item.id}" data-type="${item.media_type || 'movie'}">
+            ${item.poster_path 
+              ? `<img class="search-result-poster" src="https://image.tmdb.org/t/p/w92${item.poster_path}" alt="${title}">`
+              : '<div class="search-result-poster">No Image</div>'
+            }
+            <div class="search-result-info">              <div class="search-result-header">
+                <div class="search-result-title">
+                  ${title}<span class="search-result-year">${year}</span>
+                </div>
+                <span class="search-result-type ${mediaTypeClass}">${mediaType}</span>
+              </div>
+              <div class="search-result-rating">
+                <span class="search-result-score">${rating}/10</span>
+                <span class="search-result-votes">(${voteCount.toLocaleString()} votes)</span>
+              </div>
+              ${infoTags}
+              ${directorInfo}
+              ${castInfo}
+              <div class="search-result-overview">${overview}</div>
             </div>
-            <div class="search-result-cast">${item.overview ? item.overview.substring(0, 100) + '...' : ''}</div>
           </div>
-        </div>
-      `).join('');
-      
-      // Add click handlers to search results
+        `;
+      }).join('');
+        // Add click handlers to search results
       document.querySelectorAll('.search-result-item').forEach(item => {
         item.addEventListener('click', () => {
           const selectedId = item.dataset.id;
           const selectedType = item.dataset.type;
           
+          // Find the selected item data
+          const selectedItem = results.find(r => r.id == selectedId && r.media_type == selectedType);
+          
           // Store selected media data
           window.selectedMedia = {
             id: selectedId,
-            type: selectedType
+            type: selectedType,
+            data: selectedItem
           };
+          
+          // Show selected media display
+          displaySelectedMedia(selectedItem);
           
           // Hide search results and show custom fields
           searchResults.style.display = 'none';
@@ -148,6 +214,40 @@ document.addEventListener('DOMContentLoaded', () => {
         });
       });
     }
+
+    // Function to display selected media
+    function displaySelectedMedia(item) {
+      const selectedMediaDiv = document.getElementById('selected-media');
+      const selectedPoster = document.getElementById('selected-poster');
+      const selectedTitle = document.getElementById('selected-title');
+      const selectedMeta = document.getElementById('selected-meta');
+      
+      // Set poster
+      if (item.poster_path) {
+        selectedPoster.src = `https://image.tmdb.org/t/p/w92${item.poster_path}`;
+        selectedPoster.style.display = 'block';
+      } else {
+        selectedPoster.style.display = 'none';
+      }
+      
+      // Set title and year
+      const title = item.title || item.name;
+      const year = (item.release_date || item.first_air_date) ? `(${(item.release_date || item.first_air_date).substring(0, 4)})` : '';
+      const mediaType = item.media_type === 'tv' ? 'TV Series' : 'Movie';
+      
+      selectedTitle.textContent = `${title} ${year}`;
+      selectedMeta.textContent = mediaType;
+      
+      // Show the selected media display
+      selectedMediaDiv.style.display = 'block';
+    }
+
+    // Handle change selection button
+    document.getElementById('change-selection').addEventListener('click', () => {
+      document.getElementById('selected-media').style.display = 'none';
+      document.getElementById('search-results').style.display = 'block';
+      document.getElementById('custom-fields').style.display = 'none';
+    });
 
     // Live update slider labels
     const sliderIds = [

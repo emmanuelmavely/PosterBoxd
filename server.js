@@ -28,6 +28,7 @@ const TMDB_API_KEY = process.env.TMDB_API_KEY;
 
 // Search endpoint
 app.post('/search-media', async (req, res) => {
+  console.log('🔍 Search endpoint called with query:', req.body.query);
   try {
     const { query } = req.body;
     
@@ -38,12 +39,76 @@ app.post('/search-media', async (req, res) => {
     ]);
     
     // Combine and sort by popularity
-    const allResults = [
+    let allResults = [
       ...(movieResults.results || []).map(item => ({ ...item, media_type: 'movie' })),
       ...(tvResults.results || []).map(item => ({ ...item, media_type: 'tv' }))
     ].sort((a, b) => b.popularity - a.popularity).slice(0, 10);
+      // Enhance results with director and cast info
+    const enhancedResults = await Promise.all(
+      allResults.map(async (item) => {
+        try {          let credits, details;
+          if (item.media_type === 'movie') {
+            [credits, details] = await Promise.all([
+              fetch(`https://api.themoviedb.org/3/movie/${item.id}/credits?api_key=${TMDB_API_KEY}`).then(r => r.json()),
+              fetch(`https://api.themoviedb.org/3/movie/${item.id}?api_key=${TMDB_API_KEY}`).then(r => r.json())
+            ]);
+          } else {
+            // For TV shows, fetch both credits and detailed info
+            [credits, details] = await Promise.all([
+              fetch(`https://api.themoviedb.org/3/tv/${item.id}/credits?api_key=${TMDB_API_KEY}`).then(r => r.json()),
+              fetch(`https://api.themoviedb.org/3/tv/${item.id}?api_key=${TMDB_API_KEY}`).then(r => r.json())
+            ]);
+            console.log(`TV Series "${item.name}" details:`, {
+              seasons: details.number_of_seasons,
+              episodes: details.number_of_episodes,
+              runtime: details.episode_run_time
+            });
+          }
+            const director = credits.crew?.find(c => c.job === 'Director')?.name || '';
+          const creator = credits.crew?.find(c => c.job === 'Creator')?.name || details.created_by?.[0]?.name || '';
+          const cast = credits.cast?.slice(0, 3).map(c => c.name) || [];
+            // Add media-specific details
+          let mediaDetails = {};
+          if (item.media_type === 'tv') {
+            mediaDetails = {
+              number_of_seasons: details.number_of_seasons,
+              number_of_episodes: details.number_of_episodes,
+              episode_run_time: details.episode_run_time,
+              status: details.status
+            };
+          } else {
+            // Add runtime for movies
+            mediaDetails = {
+              runtime: details.runtime
+            };
+          }          const finalResult = {
+            ...item,
+            director: item.media_type === 'movie' ? director : creator,
+            cast: cast,
+            ...mediaDetails
+          };
+          
+          if (item.media_type === 'tv') {
+            console.log(`TV Series "${item.name}" details:`, {
+              seasons: details.number_of_seasons,
+              episodes: details.number_of_episodes,
+              runtime: details.episode_run_time
+            });
+          }
+          
+          return finalResult;} catch (error) {
+          // If credits fetch fails, return item without additional info
+          console.error(`Failed to fetch details for ${item.title || item.name}:`, error.message);
+          return {
+            ...item,
+            director: '',
+            cast: []
+          };
+        }
+      })
+    );
     
-    res.json({ results: allResults });
+    res.json({ results: enhancedResults });
   } catch (error) {
     console.error('Search error:', error);
     res.status(500).json({ error: 'Search failed' });

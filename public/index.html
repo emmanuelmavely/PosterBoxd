@@ -71,8 +71,19 @@
         <label for="custom-title">Title:</label>
         <input type="text" id="custom-title" placeholder="Enter movie or TV series title..." />
         <button type="button" id="search-button">Search</button>
+          <div id="search-results" class="search-results" style="display: none;"></div>
         
-        <div id="search-results" class="search-results" style="display: none;"></div>
+        <!-- Selected media display -->
+        <div id="selected-media" class="selected-media" style="display: none;">
+          <div class="selected-media-content">
+            <img id="selected-poster" class="selected-poster" alt="Selected media poster">
+            <div class="selected-info">
+              <div class="selected-title" id="selected-title"></div>
+              <div class="selected-meta" id="selected-meta"></div>
+            </div>
+            <button type="button" class="change-selection-btn" id="change-selection">Change</button>
+          </div>
+        </div>
         
         <div id="custom-fields" style="display: none;">
           <div style="margin-top: 1.5rem;"></div>
