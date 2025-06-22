@@ -281,7 +281,12 @@ async function generateExperimentalPoster(movieData, settings, selectedPosterInd
   let baseImage = selectedBackground
     ? sharp(await (await fetch(selectedBackground)).arrayBuffer())
         .resize(width, height, { fit: 'cover' })
-        .modulate({ brightness: settings.backdropBrightness ?? 0.6 })
+        // Fix: Only apply brightness reduction if gradient is enabled
+        .modulate({ 
+          brightness: settings.gradientOverlay !== false 
+            ? (settings.backdropBrightness ?? 0.6) 
+            : 1.0  // Full brightness when gradient is disabled
+        })
     : sharp({ create: { width, height, channels: 3, background: '#000' } });
   if (settings.blurBackdrop ?? true) baseImage = baseImage.blur(10);
 
@@ -448,7 +453,8 @@ async function generateExperimentalPoster(movieData, settings, selectedPosterInd
 
   // Compose layers
   const layers = [];
-  if (settings.gradientOverlay) {
+  // Fix: Check gradientOverlay setting properly
+  if (settings.gradientOverlay !== false) {
     const gradientSvg = `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
       <defs><linearGradient id="fade" x1="0" y1="1" x2="0" y2="0">
       <stop offset="0%" stop-color="#000" stop-opacity="0.5"/>
@@ -458,7 +464,7 @@ async function generateExperimentalPoster(movieData, settings, selectedPosterInd
   }
   layers.push({ input: Buffer.from(svg), top: 0, left: 0 });
 
-  return await baseImage.composite(layers).jpeg({ quality: 90 }).toBuffer();
+  return await baseImage.composite(layers).png().toBuffer();
 }
 
 async function generatePosterImage(movieData, settings, selectedPosterIndex = 0, selectedBackgroundIndex = 0, selectedLogoIndex = 0) {
@@ -662,7 +668,7 @@ async function generatePosterImage(movieData, settings, selectedPosterIndex = 0,
 
   layers.push({ input: Buffer.from(textSvg), top: 0, left: 0 });
 
-  return await baseImage.composite(layers).jpeg({ quality: 90 }).toBuffer();
+  return await baseImage.composite(layers).png().toBuffer();
 }
 
 app.post('/generate-image', async (req, res) => {
@@ -713,9 +719,10 @@ app.post('/generate-image', async (req, res) => {
       console.log('🎞️ Director:', directorText);
       console.log('👤 Username:', username);
       console.log('📅 Watched on:', watchedDate);
-      console.log('❤️ Liked:', isLiked);
 
-      const { movie, details, credits, images } = await fetchTmdbData(title, year, directorText);      movieData = {
+      const { movie, details, credits, images } = await fetchTmdbData(title, year, directorText);
+
+      movieData = {
         title,
         year,
         username,
@@ -952,7 +959,7 @@ app.post('/regenerate-image', async (req, res) => {
     
     const finalBuffer = await generatePosterImage(movieData, settings, selectedPosterIndex, selectedBackgroundIndex, selectedLogoIndex);
     
-    res.setHeader('Content-Type', 'image/jpeg');
+    res.setHeader('Content-Type', 'image/png');
     res.send(finalBuffer);
 
   } catch (err) {

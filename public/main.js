@@ -515,22 +515,110 @@ document.addEventListener('DOMContentLoaded', () => {
 
         overlay.classList.remove('show');
 
-        // Update button handlers
-        copyButton.onclick = async () => {
-          await navigator.clipboard.write([new ClipboardItem({ 'image/jpeg': blob })]);
-          alert('Image copied to clipboard!');
-        };
-
-        downloadButton.onclick = () => {
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = 'letterboxd-poster.jpg';
-          a.click();
-        };
+        // Update button handlers - Store current blob for copy functionality
+        window.currentImageBlob = blob;
+        updateButtonHandlers();
 
       } catch (err) {
         alert('Error: ' + err.message);
         overlay.classList.remove('show');
+      }
+    }
+
+    // Function to check clipboard API support
+    function isClipboardSupported() {
+      return navigator.clipboard && navigator.clipboard.write && window.isSecureContext;
+    }
+
+    // Improved copy to clipboard function
+    async function copyImageToClipboard(blob) {
+      if (!isClipboardSupported()) {
+        throw new Error('Clipboard API not supported. Please use the download button instead.');
+      }
+
+      try {
+        // Convert to PNG if not already
+        let pngBlob = blob;
+        if (blob.type !== 'image/png') {
+          // Create canvas to convert to PNG
+          const img = new Image();
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          
+          await new Promise((resolve, reject) => {
+            img.onload = resolve;
+            img.onerror = reject;
+            img.src = URL.createObjectURL(blob);
+          });
+          
+          canvas.width = img.width;
+          canvas.height = img.height;
+          ctx.drawImage(img, 0, 0);
+          
+          pngBlob = await new Promise(resolve => {
+            canvas.toBlob(resolve, 'image/png');
+          });
+          
+          URL.revokeObjectURL(img.src);
+        }
+
+        await navigator.clipboard.write([
+          new ClipboardItem({ 'image/png': pngBlob })
+        ]);
+        
+        return true;
+      } catch (error) {
+        console.error('Clipboard write failed:', error);
+        throw error;
+      }
+    }
+
+    // Separate function to update button handlers
+    function updateButtonHandlers() {
+      if (window.currentImageBlob) {
+        copyButton.onclick = async (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          
+          // Update button state
+          const originalText = copyButton.textContent;
+          copyButton.textContent = 'Copying...';
+          copyButton.disabled = true;
+          
+          try {
+            await copyImageToClipboard(window.currentImageBlob);
+            copyButton.textContent = 'Copied!';
+            setTimeout(() => {
+              copyButton.textContent = originalText;
+              copyButton.disabled = false;
+            }, 2000);
+          } catch (error) {
+            console.error('Copy failed:', error);
+            copyButton.textContent = originalText;
+            copyButton.disabled = false;
+            
+            // Show user-friendly error message based on error type
+            let errorMessage = 'Failed to copy image to clipboard.';
+            if (error.message.includes('not supported')) {
+              errorMessage = 'Clipboard not supported. Use HTTPS or try the download button.';
+            } else if (error.message.includes('NotAllowedError')) {
+              errorMessage = 'Clipboard access denied. Please try the download button.';
+            }
+            
+            alert(errorMessage);
+          }
+        };
+
+        downloadButton.onclick = (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const url = URL.createObjectURL(window.currentImageBlob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = 'letterboxd-poster.png';
+          a.click();
+          URL.revokeObjectURL(url);
+        };
       }
     }
 
@@ -627,7 +715,7 @@ document.addEventListener('DOMContentLoaded', () => {
         contentOrder: contentOrder,
         ...metadataSettings,
         blurBackdrop: document.getElementById('blur-backdrop').checked,
-        gradientOverlay: document.getElementById('gradient-toggle').checked,
+        gradientOverlay: document.getElementById('gradient-overlay').checked,
         backdropBrightness: parseFloat(document.getElementById('backdrop-brightness').value) / 100,
         posterScale: parseFloat(document.getElementById('poster-scale').value),
         footerScale: parseFloat(document.getElementById('footer-scale').value),
@@ -664,7 +752,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const responseData = await res.json();
         
-        const blob = new Blob([new Uint8Array(responseData.imageBuffer.data)], { type: 'image/jpeg' });
+        const blob = new Blob([new Uint8Array(responseData.imageBuffer.data)], { type: 'image/png' });
         const url = URL.createObjectURL(blob);
         
         generatedImage.src = url;
@@ -678,17 +766,9 @@ document.addEventListener('DOMContentLoaded', () => {
         
         populateMenuOptions(responseData.movieData);
 
-        copyButton.onclick = async () => {
-          await navigator.clipboard.write([new ClipboardItem({ 'image/jpeg': blob })]);
-          alert('Image copied to clipboard!');
-        };
-
-        downloadButton.onclick = () => {
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = 'letterboxd-poster.jpg';
-          a.click();
-        };
+        // Store current blob and set up button handlers
+        window.currentImageBlob = blob;
+        updateButtonHandlers();
 
       } catch (err) {
         console.error('Error generating poster:', err);
