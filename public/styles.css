@@ -729,6 +729,17 @@ div.search-result-poster {
   border-radius: 4px;
 }
 
+/* Add spacing for experimental settings */
+.experimental-only-setting label {
+  margin-bottom: 1rem;
+}
+
+.experimental-only-setting label:first-child {
+  margin-bottom: 1.5rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid #3a3a3c;
+}
+
 /* New logo alignment selector */
 #logo-alignment {
   width: 95%;

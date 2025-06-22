@@ -28,9 +28,18 @@ const TMDB_API_KEY = process.env.TMDB_API_KEY;
 
 // Search endpoint
 app.post('/search-media', async (req, res) => {
-  console.log('🔍 Search endpoint called with query:', req.body.query);
+  const { query } = req.body;
+  
+  console.log('\n🔍 === SEARCH REQUEST ===');
+  console.log('📝 User Input:', {
+    query: query,
+    timestamp: new Date().toISOString()
+  });
+  
   try {
-    const { query } = req.body;
+    console.log('\n📡 TMDB API Requests:');
+    console.log('  → Movie Search:', `https://api.themoviedb.org/3/search/movie?query=${encodeURIComponent(query)}`);
+    console.log('  → TV Search:', `https://api.themoviedb.org/3/search/tv?query=${encodeURIComponent(query)}`);
     
     // Search both movies and TV shows
     const [movieResults, tvResults] = await Promise.all([
@@ -38,36 +47,46 @@ app.post('/search-media', async (req, res) => {
       fetch(`https://api.themoviedb.org/3/search/tv?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(query)}`).then(r => r.json())
     ]);
     
+    console.log('\n📊 TMDB Search Results:');
+    console.log('  🎬 Movies found:', movieResults.results?.length || 0);
+    console.log('  📺 TV shows found:', tvResults.results?.length || 0);
+    
     // Combine and sort by popularity
     let allResults = [
       ...(movieResults.results || []).map(item => ({ ...item, media_type: 'movie' })),
       ...(tvResults.results || []).map(item => ({ ...item, media_type: 'tv' }))
     ].sort((a, b) => b.popularity - a.popularity).slice(0, 10);
-      // Enhance results with director and cast info
+    
+    console.log('  🔗 Combined results (top 10):', allResults.length);
+    
+    // Enhance results with director and cast info
+    console.log('\n🔍 Fetching detailed info for each result...');
     const enhancedResults = await Promise.all(
-      allResults.map(async (item) => {
-        try {          let credits, details;
+      allResults.map(async (item, index) => {
+        try {
+          const itemTitle = item.title || item.name;
+          console.log(`\n  ${index + 1}. Processing: "${itemTitle}" (${item.media_type})`);
+          
+          let credits, details;
           if (item.media_type === 'movie') {
+            console.log('    📡 Fetching movie credits & details...');
             [credits, details] = await Promise.all([
               fetch(`https://api.themoviedb.org/3/movie/${item.id}/credits?api_key=${TMDB_API_KEY}`).then(r => r.json()),
               fetch(`https://api.themoviedb.org/3/movie/${item.id}?api_key=${TMDB_API_KEY}`).then(r => r.json())
             ]);
           } else {
-            // For TV shows, fetch both credits and detailed info
+            console.log('    📡 Fetching TV credits & details...');
             [credits, details] = await Promise.all([
               fetch(`https://api.themoviedb.org/3/tv/${item.id}/credits?api_key=${TMDB_API_KEY}`).then(r => r.json()),
               fetch(`https://api.themoviedb.org/3/tv/${item.id}?api_key=${TMDB_API_KEY}`).then(r => r.json())
             ]);
-            console.log(`TV Series "${item.name}" details:`, {
-              seasons: details.number_of_seasons,
-              episodes: details.number_of_episodes,
-              runtime: details.episode_run_time
-            });
           }
-            const director = credits.crew?.find(c => c.job === 'Director')?.name || '';
+          
+          const director = credits.crew?.find(c => c.job === 'Director')?.name || '';
           const creator = credits.crew?.find(c => c.job === 'Creator')?.name || details.created_by?.[0]?.name || '';
           const cast = credits.cast?.slice(0, 3).map(c => c.name) || [];
-            // Add media-specific details
+          
+          // Add media-specific details
           let mediaDetails = {};
           if (item.media_type === 'tv') {
             mediaDetails = {
@@ -76,29 +95,34 @@ app.post('/search-media', async (req, res) => {
               episode_run_time: details.episode_run_time,
               status: details.status
             };
+            console.log('    ✅ TV Details:', {
+              seasons: details.number_of_seasons,
+              episodes: details.number_of_episodes,
+              runtime: details.episode_run_time,
+              creator: creator || 'N/A'
+            });
           } else {
-            // Add runtime for movies
             mediaDetails = {
               runtime: details.runtime
             };
-          }          const finalResult = {
+            console.log('    ✅ Movie Details:', {
+              runtime: details.runtime ? `${details.runtime}min` : 'N/A',
+              director: director || 'N/A'
+            });
+          }
+          
+          console.log('    👥 Cast:', cast.length > 0 ? cast.join(', ') : 'N/A');
+          
+          const finalResult = {
             ...item,
             director: item.media_type === 'movie' ? director : creator,
             cast: cast,
             ...mediaDetails
           };
           
-          if (item.media_type === 'tv') {
-            console.log(`TV Series "${item.name}" details:`, {
-              seasons: details.number_of_seasons,
-              episodes: details.number_of_episodes,
-              runtime: details.episode_run_time
-            });
-          }
-          
-          return finalResult;} catch (error) {
-          // If credits fetch fails, return item without additional info
-          console.error(`Failed to fetch details for ${item.title || item.name}:`, error.message);
+          return finalResult;
+        } catch (error) {
+          console.error(`    ❌ Failed to fetch details: ${error.message}`);
           return {
             ...item,
             director: '',
@@ -108,9 +132,15 @@ app.post('/search-media', async (req, res) => {
       })
     );
     
+    console.log('\n📋 Final Search Response Summary:');
+    console.log(`  🎯 Returning ${enhancedResults.length} enhanced results`);
+    enhancedResults.forEach((item, index) => {
+      console.log(`    ${index + 1}. ${item.title || item.name} (${item.media_type}) - ${item.director || 'No director'}`);
+    });
+    
     res.json({ results: enhancedResults });
   } catch (error) {
-    console.error('Search error:', error);
+    console.error('\n❌ SEARCH ERROR:', error);
     res.status(500).json({ error: 'Search failed' });
   }
 });
@@ -135,27 +165,114 @@ function wrapText(text, maxChars) {
   return lines;
 }
 
+// Helper to wrap SVG text for the title (experimental view)
+function wrapSvgText(text, maxWidthPx, fontSizePx = 60, fontFamily = 'Poppins', leftX = 80, maxLines = 3) {
+  // Approximate: assume average char width is 0.6 * fontSizePx (works for most sans-serif)
+  // For more accuracy, use a text measurement library, but this is good for now.
+  const avgCharPx = fontSizePx * 0.6;
+  const maxChars = Math.floor(maxWidthPx / avgCharPx);
+  const words = text.split(' ');
+  const lines = [];
+  let current = '';
+  for (const word of words) {
+    if ((current + word).length > maxChars) {
+      lines.push(current.trim());
+      current = word + ' ';
+      if (lines.length >= maxLines) break;
+    } else {
+      current += word + ' ';
+    }
+  }
+  if (current && lines.length < maxLines) lines.push(current.trim());
+  return lines;
+}
+
 async function fetchTmdbData(title, year = '', expectedDirector = '') {
-  console.log('🔍 Searching TMDb for:', title, year, expectedDirector);
+  console.log('\n🔍 === TMDB DATA FETCH ===');
+  console.log('📝 Input Parameters:', {
+    title: title,
+    year: year || 'Not specified',
+    expectedDirector: expectedDirector || 'Not specified'
+  });
+  
   const searchUrl = `https://api.themoviedb.org/3/search/movie?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(title)}${year ? `&year=${year}` : ''}`;
+  console.log('📡 TMDB Search URL:', searchUrl.replace(TMDB_API_KEY, '[API_KEY]'));
+  
   const searchData = await fetch(searchUrl).then(res => res.json());
   const results = searchData.results || [];
+  
+  console.log(`📊 Search Results: Found ${results.length} movies`);
+  
+  if (results.length > 0) {
+    console.log('🎬 Top Results:');
+    results.slice(0, 3).forEach((movie, index) => {
+      console.log(`  ${index + 1}. "${movie.title}" (${movie.release_date?.substring(0, 4) || 'Unknown year'})`);
+    });
+  }
 
   for (const movie of results) {
+    console.log(`\n🔍 Checking movie: "${movie.title}" (${movie.release_date?.substring(0, 4)})`);
+    console.log(`📡 Fetching credits for movie ID: ${movie.id}`);
+    
     const credits = await fetch(`https://api.themoviedb.org/3/movie/${movie.id}/credits?api_key=${TMDB_API_KEY}`).then(res => res.json());
     const director = credits.crew.find(c => c.job === 'Director')?.name || '';
+    
+    console.log(`🎭 Director found: ${director || 'None'}`);
+    
     if (expectedDirector && director.toLowerCase().includes(expectedDirector.toLowerCase())) {
-      const details = await fetch(`https://api.themoviedb.org/3/movie/${movie.id}?api_key=${TMDB_API_KEY}`).then(res => res.json());
-      const images = await fetch(`https://api.themoviedb.org/3/movie/${movie.id}/images?api_key=${TMDB_API_KEY}`).then(res => res.json());
+      console.log(`✅ Director match found! "${director}" matches "${expectedDirector}"`);
+      console.log(`📡 Fetching detailed data for "${movie.title}"`);
+      
+      const [details, images] = await Promise.all([
+        fetch(`https://api.themoviedb.org/3/movie/${movie.id}?api_key=${TMDB_API_KEY}`).then(res => res.json()),
+        fetch(`https://api.themoviedb.org/3/movie/${movie.id}/images?api_key=${TMDB_API_KEY}`).then(res => res.json())
+      ]);
+      
+      console.log('📋 Complete Data Retrieved:');
+      console.log('  🎬 Movie Details:', {
+        title: movie.title,
+        year: movie.release_date?.substring(0, 4),
+        runtime: details.runtime ? `${details.runtime}min` : 'N/A',
+        genres: details.genres?.map(g => g.name).join(', ') || 'N/A'
+      });
+      console.log('  🎭 Credits:', {
+        director: director,
+        cast_count: credits.cast?.length || 0,
+        crew_count: credits.crew?.length || 0,
+        top_cast: credits.cast?.slice(0, 3).map(c => c.name).join(', ') || 'N/A'
+      });
+      console.log('  🖼️ Images:', {
+        posters: images.posters?.length || 0,
+        backdrops: images.backdrops?.length || 0,
+        logos: images.logos?.length || 0
+      });
+      
       return { movie, details, credits, images };
+    } else if (expectedDirector) {
+      console.log(`❌ Director mismatch: "${director}" ≠ "${expectedDirector}"`);
     }
   }
 
-  if (!results.length) throw new Error('No TMDb match found');
+  if (!results.length) {
+    console.error('❌ No TMDb results found');
+    throw new Error('No TMDb match found');
+  }
+  
+  console.log('⚠️ No director match found, using fallback (first result)');
   const fallback = results[0];
-  const details = await fetch(`https://api.themoviedb.org/3/movie/${fallback.id}?api_key=${TMDB_API_KEY}`).then(res => res.json());
-  const credits = await fetch(`https://api.themoviedb.org/3/movie/${fallback.id}/credits?api_key=${TMDB_API_KEY}`).then(res => res.json());
-  const images = await fetch(`https://api.themoviedb.org/3/movie/${fallback.id}/images?api_key=${TMDB_API_KEY}`).then(res => res.json());
+  console.log(`📡 Fetching fallback data for "${fallback.title}"`);
+  
+  const [details, credits, images] = await Promise.all([
+    fetch(`https://api.themoviedb.org/3/movie/${fallback.id}?api_key=${TMDB_API_KEY}`).then(res => res.json()),
+    fetch(`https://api.themoviedb.org/3/movie/${fallback.id}/credits?api_key=${TMDB_API_KEY}`).then(res => res.json()),
+    fetch(`https://api.themoviedb.org/3/movie/${fallback.id}/images?api_key=${TMDB_API_KEY}`).then(res => res.json())
+  ]);
+  
+  console.log('📋 Fallback Data Retrieved:');
+  console.log('  🎬 Movie:', fallback.title);
+  console.log('  🎭 Director:', credits.crew.find(c => c.job === 'Director')?.name || 'Unknown');
+  console.log('  🖼️ Assets:', `${images.posters?.length || 0} posters, ${images.backdrops?.length || 0} backdrops`);
+  
   return { movie: fallback, details, credits, images };
 }
 
@@ -309,11 +426,8 @@ async function generateExperimentalPoster(movieData, settings, selectedPosterInd
   let svgContent = '';
   // --- Title logo from TMDB if available ---
   let logoPlaced = false;
-  if (images && images.logos && images.logos.length > 0) {
-    console.log(`🎨 [Logo Processing] Found ${images.logos.length} available logo(s):`);
-    images.logos.forEach((logo, index) => {
-      console.log(`   ${index}: ${logo.iso_639_1 || 'null'} | ${logo.width}x${logo.height} | ${logo.file_path}`);
-    });
+  if (settings.showLogo && images && images.logos && images.logos.length > 0) {
+    console.log(`🎨 [Logo Processing] Found ${images.logos.length} logo(s) available`);
     
     const logoSizes = ['w500', 'original', 'w300'];
     
@@ -324,25 +438,22 @@ async function generateExperimentalPoster(movieData, settings, selectedPosterInd
       logoObj = images.logos.find(l => l.iso_639_1 === 'en') || images.logos[0];
       const englishIndex = images.logos.findIndex(l => l.iso_639_1 === 'en');
       if (englishIndex !== -1) {
-        console.log(`✅ [Logo] Using English logo (index ${englishIndex})`);
+        console.log(`✅ [Logo] Using English logo (${logoObj.width}x${logoObj.height})`);
       } else {
-        console.log(`⚠️  [Logo] No English logo found, using first available (index 0)`);
+        console.log(`⚠️  [Logo] No English logo found, using first available (${logoObj.width}x${logoObj.height})`);
       }
     } else {
       logoObj = images.logos[selectedLogoIndex] || images.logos[0];
-      console.log(`🎯 [Logo] Using selected logo (index ${selectedLogoIndex}): ${logoObj.iso_639_1 || 'null'}`);
+      console.log(`🎯 [Logo] Using selected logo #${selectedLogoIndex}: ${logoObj.iso_639_1 || 'null'} (${logoObj.width}x${logoObj.height})`);
     }
     
     if (logoObj && logoObj.file_path) {
-      console.log(`🔄 [Logo] Attempting to fetch logo: ${logoObj.iso_639_1 || 'null'} (${logoObj.width}x${logoObj.height})`);
-      
       for (const size of logoSizes) {
         try {
           const logoUrl = `https://image.tmdb.org/t/p/${size}${logoObj.file_path}`;
           const logoResp = await fetch(logoUrl);
           
           if (!logoResp.ok) {
-            console.log(`   ❌ Size ${size}: HTTP ${logoResp.status}`);
             continue;
           }
           
@@ -358,55 +469,71 @@ async function generateExperimentalPoster(movieData, settings, selectedPosterInd
             y += logoH + titleCrewGap;
             logoPlaced = true;
             
-            console.log(`   ✅ Size ${size}: Success (${Math.round(logoBuffer.length/1024)}KB, ${contentType})`);
-            console.log(`🎨 [Logo] Placed successfully at (${logoX}, ${y-logoH-titleCrewGap}) with ${settings.experimentalSettings?.logoAlignment || 'left'} alignment`);
+            console.log(`🎨 [Logo] Placed successfully (${Math.round(logoBuffer.length/1024)}KB, ${settings.experimentalSettings?.logoAlignment || 'left'} aligned)`);
             break;
-          } else {
-            console.log(`   ⚠️  Size ${size}: Too small (${logoBuffer.length} bytes)`);
           }
         } catch (e) {
-          console.log(`   ❌ Size ${size}: ${e.message}`);
+          // Silent fail and try next size
+          continue;
         }
       }
     }
   }
   
+  // Always show title if no TMDB logo was placed OR if showLogo is false
   if (!logoPlaced) {
-    console.log(`📝 [Logo] Using text fallback: "${movieData.title}"`);
+    console.log(`📝 [Logo] Using text title: "${movieData.title}" (showLogo: ${settings.showLogo})`);
     const year = movieData.year ? ` <tspan class="title-year">(${escapeXml(movieData.year)})</tspan>` : '';
-    svgContent += `<text x="${leftX}" y="${y}" class="logo-title" text-anchor="start">${escapeXml(movieData.title)}${year}</text>`;
-    y += 80 + titleCrewGap;
+    // Wrap title to fit within safe width (e.g., 900px)
+    const safeWidth = 900;
+    const fontSize = 60;
+    const lines = wrapSvgText(movieData.title, safeWidth, fontSize, 'Poppins', leftX, 3);
+    lines.forEach((line, idx) => {
+      let yOffset = y + idx * (fontSize + 10);
+      // Only add year to the last line
+      const yearSpan = (idx === lines.length - 1) ? year : '';
+      svgContent += `<text x="${leftX}" y="${yOffset}" class="logo-title" text-anchor="start">${escapeXml(line)}${yearSpan}</text>`;
+    });
+    y += lines.length * (fontSize + 10) ; // Reduced gap after title block from 30px to 10px
+  }
+
+  // If no logo is shown, don't add the title gap - just add a small buffer
+  if (!settings.showLogo) {
+    y += 10; // Reduced from 20 to 10
+    console.log(`📝 [Logo] Logo disabled, starting content at y=${y}`);
   }
 
   // Crew credits (grouped by role, names bold, left-aligned, char limit)
-  const groupedByRole = groupCrewByRole(credits);
-  groupedByRole.forEach(item => {
-    let displayNames = [...item.names];
-    let creditText = `${item.role}: ${displayNames.join(', ')}`;
-    // Character limit logic
-    while (creditText.length > MAX_CREDIT_LINE_CHARS && displayNames.length > 1) {
-      displayNames.pop();
-      creditText = `${item.role}: ${displayNames.join(', ')} & others`;
-    }
-    if (creditText.length > MAX_CREDIT_LINE_CHARS && displayNames.length === 1) {
-      const maxNameLength = MAX_CREDIT_LINE_CHARS - `${item.role}: `.length - 3;
-      displayNames[0] = displayNames[0].substring(0, maxNameLength) + "...";
-      creditText = `${item.role}: ${displayNames[0]}`;
-    }
-    const colonIndex = creditText.indexOf(':');
-    const rolePart = creditText.substring(0, colonIndex + 1); // This includes the colon
-    const namesPart = creditText.substring(colonIndex + 1); // This includes the space after the colon
-    
-    // Add a space after the colon in the SVG
-    svgContent += `<text x="${leftX}" y="${y}" class="credit-line">${escapeXml(rolePart)} <tspan class="credit-name">${escapeXml(namesPart.trim())}</tspan></text>`;
-    y += lineGap;
-  });
+  if (settings.showCredits) {
+    const groupedByRole = groupCrewByRole(credits);
+    groupedByRole.forEach(item => {
+      let displayNames = [...item.names];
+      let creditText = `${item.role}: ${displayNames.join(', ')}`;
+      // Character limit logic
+      while (creditText.length > MAX_CREDIT_LINE_CHARS && displayNames.length > 1) {
+        displayNames.pop();
+        creditText = `${item.role}: ${displayNames.join(', ')} & others`;
+      }
+      if (creditText.length > MAX_CREDIT_LINE_CHARS && displayNames.length === 1) {
+        const maxNameLength = MAX_CREDIT_LINE_CHARS - `${item.role}: `.length - 3;
+        displayNames[0] = displayNames[0].substring(0, maxNameLength) + "...";
+        creditText = `${item.role}: ${displayNames[0]}`;
+      }
+      const colonIndex = creditText.indexOf(':');
+      const rolePart = creditText.substring(0, colonIndex + 1); // This includes the colon
+      const namesPart = creditText.substring(colonIndex + 1); // This includes the space after the colon
+      
+      // Add a space after the colon in the SVG
+      svgContent += `<text x="${leftX}" y="${y}" class="credit-line">${escapeXml(rolePart)} <tspan class="credit-name">${escapeXml(namesPart.trim())}</tspan></text>`;
+      y += lineGap;
+    });
 
-  // Add a smaller gap before the stars
-  y += crewStarsGap;
+    // Add a smaller gap before the stars
+    y += crewStarsGap;
+  }
 
   // Rating stars (left-aligned, just below crew info)
-  if (rating) {
+  if (settings.showRating && rating) {
     svgContent += `<text x="${leftX}" y="${y}" class="rating-stars" text-anchor="start">${escapeXml(getStarString(rating))}</text>`;
     y += lineGap;
   }
@@ -431,14 +558,14 @@ async function generateExperimentalPoster(movieData, settings, selectedPosterInd
   svgContent += `
     <text x="540" y="${footerY}" text-anchor="middle" class="footer-username">${escapeXml(username)}</text>
     <text x="540" y="${footerY + 24}" text-anchor="middle" class="footer-on">— on —</text>
-    <image x="${(1080 - footerLogoW) / 2}" y="${footerY + 38}" width="${footerLogoW}" height="${footerLogoH}" xlink:href="${posterboxdLogoDataUrl}" class="logo-footer" />
+    <image x="${(1080 - footerLogoW) / 2}" y="${footerY + 20}" width="${footerLogoW}" height="${footerLogoH}" xlink:href="${posterboxdLogoDataUrl}" class="logo-footer" />
   `;
 
   // SVG style (add .title-year for thin Poppins + add tags and watched-date styles)
   let svg = `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
     <style><![CDATA[
-      .logo-title { font-family: 'Poppins', sans-serif; font-size: 80px; font-weight: 700; fill: #fff; }
-      .title-year { font-family: 'Poppins', sans-serif; font-size: 60px; font-weight: 300; fill: #fff; }
+      .logo-title { font-family: 'Poppins', sans-serif; font-size: 60px; font-weight: 700; fill: #fff; }
+      .title-year { font-family: 'Poppins', sans-serif; font-size: 45px; font-weight: 300; fill: #fff; }
       .credit-line { font-family: 'Poppins', sans-serif; font-size: 28px; font-weight: 400; fill: #fff; text-anchor: start; }
       .credit-name { font-family: 'Poppins', sans-serif; font-size: 28px; font-weight: 700; fill: #fff; }
       .rating-stars { font-family: 'Poppins', sans-serif; font-size: 54px; fill: #00d474; letter-spacing: 8px; }
@@ -673,17 +800,34 @@ async function generatePosterImage(movieData, settings, selectedPosterIndex = 0,
 
 app.post('/generate-image', async (req, res) => {
   try {
-    console.log('Received request with body:', JSON.stringify(req.body, null, 2));
+    console.log('\n🎨 === IMAGE GENERATION REQUEST ===');
+    console.log('📝 Request Body Keys:', Object.keys(req.body));
     
     const { mode, settings = {}, selectedPosterIndex = 0, selectedBackgroundIndex = 0, selectedLogoIndex = 0 } = req.body;
+    
+    console.log('⚙️ Generation Settings:', {
+      mode: mode,
+      posterStyle: settings.posterStyle || 'classic',
+      selectedIndices: {
+        poster: selectedPosterIndex,
+        background: selectedBackgroundIndex,
+        logo: selectedLogoIndex
+      }
+    });
+    
     let movieData;
 
     if (mode === 'letterboxd') {
-      // Letterboxd mode
+      console.log('\n📖 === LETTERBOXD MODE ===');
       const { letterboxdUrl } = req.body;
+      console.log('🔗 Letterboxd URL:', letterboxdUrl);
+      
+      console.log('📡 Fetching Letterboxd page...');
       const response = await fetch(letterboxdUrl);
       const html = await response.text();
-      const $ = cheerio.load(html);      // Try new structure first (2025 format)
+      const $ = cheerio.load(html);
+
+      // Try new structure first (2025 format)
       let title = $('.inline-production-masthead .name a').first().text().trim();
       let year = $('.inline-production-masthead .releasedate a').first().text().trim();
       
@@ -714,11 +858,15 @@ app.post('/generate-image', async (req, res) => {
         }
       }
 
-      console.log('🎬 Title:', title);
-      console.log('📅 Year:', year);
-      console.log('🎞️ Director:', directorText);
-      console.log('👤 Username:', username);
-      console.log('📅 Watched on:', watchedDate);
+      console.log('📋 Extracted Letterboxd Data:');
+      console.log('  🎬 Title:', title || 'Not found');
+      console.log('  📅 Year:', year || 'Not found');
+      console.log('  🎭 Director:', directorText || 'Not found');
+      console.log('  👤 Username:', username || 'Not found');
+      console.log('  ⭐ Rating:', rating ? `${rating}/5` : 'No rating');
+      console.log('  ❤️ Liked:', isLiked ? 'Yes' : 'No');
+      console.log('  🏷️ Tags:', tags.length > 0 ? tags.join(', ') : 'None');
+      console.log('  📅 Watched:', watchedDate || 'Not specified');
 
       const { movie, details, credits, images } = await fetchTmdbData(title, year, directorText);
 
@@ -741,140 +889,100 @@ app.post('/generate-image', async (req, res) => {
         alternativeBackdrops: images.backdrops?.slice(0, 5).map(b => `https://image.tmdb.org/t/p/w1280${b.file_path}`) || []
       };
 
-      // Log poster information
-      console.log(`🖼️ [Posters] Main poster: ${movie.poster_path ? 'Available' : 'None'}`);
-      if (movie.poster_path) {
-        console.log(`   Main: w500${movie.poster_path}`);
-      }
-      if (images.posters && images.posters.length > 0) {
-        console.log(`🖼️ [Posters] Found ${images.posters.length} alternative poster(s):`);
-        images.posters.slice(0, 5).forEach((poster, index) => {
-          console.log(`   ${index + 1}: ${poster.iso_639_1 || 'null'} | ${poster.width}x${poster.height} | w500${poster.file_path}`);
-        });
-      } else {
-        console.log(`🖼️ [Posters] No alternative posters available`);
-      }
-
-      // Log backdrop information
-      console.log(`🌄 [Backdrops] Main backdrop: ${movie.backdrop_path ? 'Available' : 'None'}`);
-      if (movie.backdrop_path) {
-        console.log(`   Main: w1280${movie.backdrop_path}`);
-      }
-      if (images.backdrops && images.backdrops.length > 0) {
-        console.log(`🌄 [Backdrops] Found ${images.backdrops.length} alternative backdrop(s):`);
-        images.backdrops.slice(0, 5).forEach((backdrop, index) => {
-          console.log(`   ${index + 1}: ${backdrop.iso_639_1 || 'null'} | ${backdrop.width}x${backdrop.height} | w1280${backdrop.file_path}`);
-        });
-      } else {
-        console.log(`🌄 [Backdrops] No alternative backdrops available`);
-      }
+      console.log('\n🖼️ === TMDB ASSETS SUMMARY ===');
+      console.log('  📱 Main Poster:', movie.poster_path ? '✅ Available' : '❌ None');
+      console.log('  🌄 Main Backdrop:', movie.backdrop_path ? '✅ Available' : '❌ None');
+      console.log('  🎭 Alternative Posters:', `${images.posters?.length || 0} found`);
+      console.log('  🏞️ Alternative Backdrops:', `${images.backdrops?.length || 0} found`);
+      console.log('  🏷️ Logos:', `${images.logos?.length || 0} found`);
       
     } else {
-      // Custom mode
+      console.log('\n🎬 === CUSTOM MODE ===');
       const { mediaId, mediaType, rating, tags, username, watchedDate } = req.body;
+      
+      console.log('📝 Custom Input Data:', {
+        mediaId: mediaId,
+        mediaType: mediaType,
+        rating: rating ? `${rating}/5` : 'No rating',
+        username: username || 'Anonymous',
+        tags: tags?.length > 0 ? tags.join(', ') : 'None',
+        watchedDate: watchedDate || 'Not specified'
+      });
       
       let mediaData;
       if (mediaType === 'tv') {
-        mediaData = await fetch(`https://api.themoviedb.org/3/tv/${mediaId}?api_key=${TMDB_API_KEY}`).then(res => res.json());
-        const credits = await fetch(`https://api.themoviedb.org/3/tv/${mediaId}/credits?api_key=${TMDB_API_KEY}`).then(res => res.json());
-        const images = await fetch(`https://api.themoviedb.org/3/tv/${mediaId}/images?api_key=${TMDB_API_KEY}`).then(res => res.json());
-          movieData = {
-          title: mediaData.name,
-          year: mediaData.first_air_date ? mediaData.first_air_date.substring(0, 4) : '',
+        console.log(`📡 Fetching TV series data for ID: ${mediaId}`);
+        const [tvData, tvCredits, tvImages] = await Promise.all([
+          fetch(`https://api.themoviedb.org/3/tv/${mediaId}?api_key=${TMDB_API_KEY}`).then(res => res.json()),
+          fetch(`https://api.themoviedb.org/3/tv/${mediaId}/credits?api_key=${TMDB_API_KEY}`).then(res => res.json()),
+          fetch(`https://api.themoviedb.org/3/tv/${mediaId}/images?api_key=${TMDB_API_KEY}`).then(res => res.json())
+        ]);
+        
+        console.log('📋 TV Series Data Retrieved:');
+        console.log('  📺 Title:', tvData.name);
+        console.log('  📅 First Air Date:', tvData.first_air_date);
+        console.log('  🔢 Seasons/Episodes:', `${tvData.number_of_seasons}/${tvData.number_of_episodes}`);
+        console.log('  ⏱️ Episode Runtime:', tvData.episode_run_time?.join(', ') + 'min' || 'N/A');
+        console.log('  🎭 Created By:', tvData.created_by?.map(c => c.name).join(', ') || 'Unknown');
+        
+        movieData = {
+          title: tvData.name,
+          year: tvData.first_air_date ? tvData.first_air_date.substring(0, 4) : '',
           username,
           tags,
           rating,
           isLiked: false,
           watchedDate: watchedDate || null,
-          movie: mediaData,
-          details: mediaData,
-          credits,
-          images,
+          movie: tvData,
+          details: tvData,
+          credits: tvCredits,
+          images: tvImages,
           isCustomMode: true,
-          mainPoster: mediaData.poster_path ? `https://image.tmdb.org/t/p/w500${mediaData.poster_path}` : null,
-          mainBackdrop: mediaData.backdrop_path ? `https://image.tmdb.org/t/p/w1280${mediaData.backdrop_path}` : null,
-          alternativePosters: images.posters?.slice(0, 5).map(p => `https://image.tmdb.org/t/p/w500${p.file_path}`) || [],
-          alternativeBackdrops: images.backdrops?.slice(0, 5).map(b => `https://image.tmdb.org/t/p/w1280${b.file_path}`) || []
+          mainPoster: tvData.poster_path ? `https://image.tmdb.org/t/p/w500${tvData.poster_path}` : null,
+          mainBackdrop: tvData.backdrop_path ? `https://image.tmdb.org/t/p/w1280${tvData.backdrop_path}` : null,
+          alternativePosters: tvImages.posters?.slice(0, 5).map(p => `https://image.tmdb.org/t/p/w500${p.file_path}`) || [],
+          alternativeBackdrops: tvImages.backdrops?.slice(0, 5).map(b => `https://image.tmdb.org/t/p/w1280${b.file_path}`) || []
         };
-
-        // Log poster information for TV series
-        console.log(`📺 [TV Posters] Main poster: ${mediaData.poster_path ? 'Available' : 'None'}`);
-        if (mediaData.poster_path) {
-          console.log(`   Main: w500${mediaData.poster_path}`);
-        }
-        if (images.posters && images.posters.length > 0) {
-          console.log(`📺 [TV Posters] Found ${images.posters.length} alternative poster(s):`);
-          images.posters.slice(0, 5).forEach((poster, index) => {
-            console.log(`   ${index + 1}: ${poster.iso_639_1 || 'null'} | ${poster.width}x${poster.height} | w500${poster.file_path}`);
-          });
-        } else {
-          console.log(`📺 [TV Posters] No alternative posters available`);
-        }
-
-        // Log backdrop information for TV series
-        console.log(`🌄 [TV Backdrops] Main backdrop: ${mediaData.backdrop_path ? 'Available' : 'None'}`);
-        if (mediaData.backdrop_path) {
-          console.log(`   Main: w1280${mediaData.backdrop_path}`);
-        }
-        if (images.backdrops && images.backdrops.length > 0) {
-          console.log(`🌄 [TV Backdrops] Found ${images.backdrops.length} alternative backdrop(s):`);
-          images.backdrops.slice(0, 5).forEach((backdrop, index) => {
-            console.log(`   ${index + 1}: ${backdrop.iso_639_1 || 'null'} | ${backdrop.width}x${backdrop.height} | w1280${backdrop.file_path}`);
-          });
-        } else {
-          console.log(`🌄 [TV Backdrops] No alternative backdrops available`);
-        }
       } else {
-        const movie = await fetch(`https://api.themoviedb.org/3/movie/${mediaId}?api_key=${TMDB_API_KEY}`).then(res => res.json());
-        const credits = await fetch(`https://api.themoviedb.org/3/movie/${mediaId}/credits?api_key=${TMDB_API_KEY}`).then(res => res.json());
-        const images = await fetch(`https://api.themoviedb.org/3/movie/${mediaId}/images?api_key=${TMDB_API_KEY}`).then(res => res.json());
-          movieData = {
-          title: movie.title,
-          year: movie.release_date ? movie.release_date.substring(0, 4) : '',
+        console.log(`📡 Fetching movie data for ID: ${mediaId}`);
+        const [movieDataFromAPI, movieCredits, movieImages] = await Promise.all([
+          fetch(`https://api.themoviedb.org/3/movie/${mediaId}?api_key=${TMDB_API_KEY}`).then(res => res.json()),
+          fetch(`https://api.themoviedb.org/3/movie/${mediaId}/credits?api_key=${TMDB_API_KEY}`).then(res => res.json()),
+          fetch(`https://api.themoviedb.org/3/movie/${mediaId}/images?api_key=${TMDB_API_KEY}`).then(res => res.json())
+        ]);
+        
+        console.log('📋 Movie Data Retrieved:');
+        console.log('  🎬 Title:', movieDataFromAPI.title);
+        console.log('  📅 Release Date:', movieDataFromAPI.release_date);
+        console.log('  ⏱️ Runtime:', movieDataFromAPI.runtime ? `${movieDataFromAPI.runtime}min` : 'N/A');
+        console.log('  🎭 Director:', movieCredits.crew?.find(c => c.job === 'Director')?.name || 'Unknown');
+        
+        movieData = {
+          title: movieDataFromAPI.title,
+          year: movieDataFromAPI.release_date ? movieDataFromAPI.release_date.substring(0, 4) : '',
           username,
           tags,
           rating,
           isLiked: false,
           watchedDate: watchedDate || null,
-          movie,
-          details: movie,
-          credits,
-          images,
+          movie: movieDataFromAPI,
+          details: movieDataFromAPI,
+          credits: movieCredits,
+          images: movieImages,
           isCustomMode: true,
-          mainPoster: movie.poster_path ? `https://image.tmdb.org/t/p/w500${movie.poster_path}` : null,
-          mainBackdrop: movie.backdrop_path ? `https://image.tmdb.org/t/p/w1280${movie.backdrop_path}` : null,
-          alternativePosters: images.posters?.slice(0, 5).map(p => `https://image.tmdb.org/t/p/w500${p.file_path}`) || [],
-          alternativeBackdrops: images.backdrops?.slice(0, 5).map(b => `https://image.tmdb.org/t/p/w1280${b.file_path}`) || []
+          mainPoster: movieDataFromAPI.poster_path ? `https://image.tmdb.org/t/p/w500${movieDataFromAPI.poster_path}` : null,
+          mainBackdrop: movieDataFromAPI.backdrop_path ? `https://image.tmdb.org/t/p/w1280${movieDataFromAPI.backdrop_path}` : null,
+          alternativePosters: movieImages.posters?.slice(0, 5).map(p => `https://image.tmdb.org/t/p/w500${p.file_path}`) || [],
+          alternativeBackdrops: movieImages.backdrops?.slice(0, 5).map(b => `https://image.tmdb.org/t/p/w1280${b.file_path}`) || []
         };
-
-        // Log poster information for movies
-        console.log(`🎬 [Movie Posters] Main poster: ${movie.poster_path ? 'Available' : 'None'}`);
-        if (movie.poster_path) {
-          console.log(`   Main: w500${movie.poster_path}`);
-        }
-        if (images.posters && images.posters.length > 0) {
-          console.log(`🎬 [Movie Posters] Found ${images.posters.length} alternative poster(s):`);
-          images.posters.slice(0, 5).forEach((poster, index) => {
-            console.log(`   ${index + 1}: ${poster.iso_639_1 || 'null'} | ${poster.width}x${poster.height} | w500${poster.file_path}`);
-          });
-        } else {
-          console.log(`🎬 [Movie Posters] No alternative posters available`);
-        }
-
-        // Log backdrop information for movies
-        console.log(`🌄 [Movie Backdrops] Main backdrop: ${movie.backdrop_path ? 'Available' : 'None'}`);
-        if (movie.backdrop_path) {
-          console.log(`   Main: w1280${movie.backdrop_path}`);
-        }
-        if (images.backdrops && images.backdrops.length > 0) {
-          console.log(`🌄 [Movie Backdrops] Found ${images.backdrops.length} alternative backdrop(s):`);
-          images.backdrops.slice(0, 5).forEach((backdrop, index) => {
-            console.log(`   ${index + 1}: ${backdrop.iso_639_1 || 'null'} | ${backdrop.width}x${backdrop.height} | w1280${backdrop.file_path}`);
-          });
-        } else {
-          console.log(`🌄 [Movie Backdrops] No alternative backdrops available`);
-        }
       }
+      
+      console.log('\n🖼️ === TMDB ASSETS SUMMARY ===');
+      console.log('  📱 Main Poster:', movieData.mainPoster ? '✅ Available' : '❌ None');
+      console.log('  🌄 Main Backdrop:', movieData.mainBackdrop ? '✅ Available' : '❌ None');
+      console.log('  🎭 Alternative Posters:', `${movieData.alternativePosters.length} found`);
+      console.log('  🏞️ Alternative Backdrops:', `${movieData.alternativeBackdrops.length} found`);
+      console.log('  🏷️ Logos:', `${movieData.images.logos?.length || 0} found`);
     }
 
     // Generate a unique session ID and store the movie data
@@ -887,13 +995,17 @@ app.post('/generate-image', async (req, res) => {
       movieDataStore.delete(firstKey);
     }
 
+    console.log('\n🎨 === STARTING IMAGE GENERATION ===');
+    console.log('🆔 Session ID:', sessionId);
+    console.log('🖼️ Image Dimensions: 1080x1920');
+    console.log('🎨 Style:', settings.posterStyle || 'classic');
+    
     const finalBuffer = await generatePosterImage(movieData, settings, selectedPosterIndex, selectedBackgroundIndex, selectedLogoIndex);
-      // After movieData is set, add logos to the response for the frontend
+    
+    // After movieData is set, add logos to the response for the frontend
     let alternativeLogos = [];
     if (settings.posterStyle === 'experimental' && movieData.images && movieData.images.logos) {
-      console.log(`🖼️ [Logos] Processing ${movieData.images.logos.length} logo(s) for frontend:`);
       alternativeLogos = movieData.images.logos.map((logo, index) => {
-        console.log(`   ${index}: ${logo.iso_639_1 || 'null'} | ${logo.width}x${logo.height} | w500${logo.file_path}`);
         return {
           url: `https://image.tmdb.org/t/p/w500${logo.file_path}`,
           language: logo.iso_639_1,
@@ -901,11 +1013,12 @@ app.post('/generate-image', async (req, res) => {
           height: logo.height
         };
       });
+      console.log(`🏷️ Processed ${alternativeLogos.length} logos for frontend`);
     }
 
     // Fix: Create a properly scoped variable for alternativeBackdrops
     let alternativeBackdrops = movieData.alternativeBackdrops || [];
-      // For experimental, send all backdrops + posters as backgrounds
+    // For experimental, send all backdrops + posters as backgrounds
     if (settings.posterStyle === 'experimental' && movieData.images) {
       const sorted = sortBackdropsByQuality(movieData.images.backdrops || []);
       let backgrounds = sorted.map(b => `https://image.tmdb.org/t/p/w1280${b.file_path}`);
@@ -919,11 +1032,22 @@ app.post('/generate-image', async (req, res) => {
       
       alternativeBackdrops = backgrounds;
       movieData.alternativeBackdrops = backgrounds;
-        console.log(`🎨 [Experimental Backgrounds] Combined ${sorted.length} backdrop(s) + ${posters.length} poster(s) = ${backgrounds.length} total background options`);
-      console.log(`🖼️ [Experimental Posters] Available for background use: ${posters.length} poster(s)`);
+      console.log(`🎨 [Experimental] Combined ${sorted.length} backdrops + ${posters.length} posters = ${backgrounds.length} total backgrounds`);
     }
 
-    console.log('Processing completed, sending response');
+    console.log('\n✅ === GENERATION COMPLETE ===');
+    console.log('📊 Response Data:', {
+      imageGenerated: '✅',
+      sessionId: sessionId,
+      assetsReturned: {
+        mainPoster: movieData.mainPoster ? '✅' : '❌',
+        mainBackdrop: movieData.mainBackdrop ? '✅' : '❌',
+        alternativePosters: movieData.alternativePosters.length,
+        alternativeBackdrops: alternativeBackdrops.length,
+        alternativeLogos: alternativeLogos.length
+      }
+    });
+
     res.json({
       imageBuffer: finalBuffer,
       sessionId: sessionId,
@@ -938,8 +1062,11 @@ app.post('/generate-image', async (req, res) => {
     });
 
   } catch (err) {
-    console.error('❌ Error generating poster:', err);
-    // More detailed error response
+    console.error('\n❌ === GENERATION ERROR ===');
+    console.error('Error Details:', {
+      message: err.message,
+      stack: process.env.NODE_ENV === 'development' ? err.stack : 'Hidden in production'
+    });
     res.status(500).json({ 
       error: err.message,
       stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
@@ -949,27 +1076,48 @@ app.post('/generate-image', async (req, res) => {
 
 app.post('/regenerate-image', async (req, res) => {
   try {
+    console.log('\n🔄 === IMAGE REGENERATION ===');
     const { sessionId, settings, selectedPosterIndex = 0, selectedBackgroundIndex = 0, selectedLogoIndex = 0 } = req.body;
+    
+    console.log('⚙️ Regeneration Parameters:', {
+      sessionId: sessionId.substring(0, 8) + '...',
+      posterIndex: selectedPosterIndex,
+      backgroundIndex: selectedBackgroundIndex,
+      logoIndex: selectedLogoIndex,
+      posterStyle: settings?.posterStyle || 'classic'
+    });
     
     // Retrieve movie data from store
     const movieData = movieDataStore.get(sessionId);
     if (!movieData) {
+      console.error('❌ Session not found:', sessionId);
       return res.status(400).json({ error: 'Session expired. Please generate a new image.' });
     }
     
+    console.log('✅ Session found, regenerating image...');
     const finalBuffer = await generatePosterImage(movieData, settings, selectedPosterIndex, selectedBackgroundIndex, selectedLogoIndex);
     
+    console.log('✅ Regeneration complete');
     res.setHeader('Content-Type', 'image/png');
     res.send(finalBuffer);
 
   } catch (err) {
-    console.error('❌ Error regenerating poster:', err);
+    console.error('\n❌ === REGENERATION ERROR ===');
+    console.error('Error:', err.message);
     res.status(500).json({ error: err.message });
   }
 });
 
 app.listen(process.env.PORT || 3000, () => console.log('🚀 Server running on port 3000'));
 
+//Server-alive
+app.get('/ping', (req, res) => {
+  res.send('pong');
+});
+//Server-alive
+app.get('/ping', (req, res) => {
+  res.send('pong');
+});
 //Server-alive
 app.get('/ping', (req, res) => {
   res.send('pong');

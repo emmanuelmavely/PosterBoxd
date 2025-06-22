@@ -273,7 +273,7 @@ document.addEventListener('DOMContentLoaded', () => {
       'blur-backdrop', 'gradient-overlay', 'logo-alignment',
       'show-title', 'show-year', 'show-genre', 'show-director', 'show-music', 
       'show-actors', 'show-rating', 'show-heart', 'show-tags', 'show-runtime', 'show-watched-date',
-      'exp-show-credits', 'exp-show-rating', 'exp-show-tags', 'exp-show-watched-date'
+      'exp-show-logo', 'exp-show-credits', 'exp-show-rating', 'exp-show-tags', 'exp-show-watched-date'
     ];
 
     settingInputs.forEach(id => {
@@ -298,7 +298,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (isExperimental) {
         contentOrder = ['logo', 'credits', 'rating', 'tags', 'watched-date'];
         metadataSettings = {
-          showLogo: true,
+          showLogo: document.getElementById('exp-show-logo').checked,
           showCredits: document.getElementById('exp-show-credits').checked,
           showRating: document.getElementById('exp-show-rating').checked,
           showTags: document.getElementById('exp-show-tags').checked,
@@ -397,9 +397,14 @@ document.addEventListener('DOMContentLoaded', () => {
     posterStyleSelect.addEventListener('change', () => {
       const isExperimental = posterStyleSelect.value === 'experimental';
       
-      // Update blur default for experimental
+      // Update defaults for experimental mode
       if (isExperimental) {
         blurBackdropCheckbox.checked = false;
+        // Set backdrop brightness to 100% for experimental mode
+        const backdropBrightnessSlider = document.getElementById('backdrop-brightness');
+        const backdropBrightnessValue = document.getElementById('backdrop-brightness-value');
+        backdropBrightnessSlider.value = 100;
+        backdropBrightnessValue.textContent = 100;
         
         // Show experimental-only settings, hide poster-only settings
         posterRelatedSettings.forEach(el => el.style.display = 'none');
@@ -409,7 +414,12 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('classic-metadata-options').style.display = 'none';
         document.getElementById('experimental-metadata-options').style.display = 'block';
       } else {
-        // Classic mode - restore default settings visibility
+        // Classic mode - restore default settings visibility and reset backdrop brightness
+        const backdropBrightnessSlider = document.getElementById('backdrop-brightness');
+        const backdropBrightnessValue = document.getElementById('backdrop-brightness-value');
+        backdropBrightnessSlider.value = 60;
+        backdropBrightnessValue.textContent = 60;
+        
         posterRelatedSettings.forEach(el => el.style.display = '');
         experimentalRelatedSettings.forEach(el => el.style.display = 'none');
         
@@ -491,10 +501,14 @@ document.addEventListener('DOMContentLoaded', () => {
       logoOptions.innerHTML = '';
       
       // Hide logo section by default
-      logoSelectionSection.style.display = 'none';      // Experimental mode: handle logos and other options
+      logoSelectionSection.style.display = 'none';
+
+      // Experimental mode: handle logos and other options
       if (posterStyleSelect.value === 'experimental') {
         // Show poster section for experimental mode (posters will be used as backgrounds)
-        posterOptionsSection.parentElement.style.display = '';        // Add poster options (main poster + alternatives) - these will be used as backgrounds
+        posterOptionsSection.parentElement.style.display = '';
+
+        // Add poster options (main poster + alternatives) - these will be used as backgrounds
         const posterList = [movieData.mainPoster, ...(movieData.alternativePosters || [])];
         posterList.forEach((poster, index) => {
           const item = createOptionItem(poster, 'poster', index, false); // Never active by default in experimental
@@ -521,23 +535,18 @@ document.addEventListener('DOMContentLoaded', () => {
             const item = createOptionItem(logo.url, 'logo', index, index === defaultLogoIndex);
             logoOptions.appendChild(item);
           });
-        }        // Combine all backdrops and posters for background selection
-        let backgrounds = [];
-        // Use sorted backdrops from backend (already sorted by quality)
-        if (movieData.alternativeBackdrops && movieData.alternativeBackdrops.length > 0) {
-          backgrounds = backgrounds.concat(movieData.alternativeBackdrops);
-        }        // Add all posters as additional backgrounds (use w1280 for consistency, avoid duplicates)
-        const posterBackgrounds = [movieData.mainPoster, ...(movieData.alternativePosters || [])].filter(Boolean);
-        posterBackgrounds.forEach(poster => {
-          // Convert poster URLs to w1280 for consistency with backdrops
-          const posterUrl = poster.replace('/w500/', '/w1280/');
-          if (!backgrounds.includes(posterUrl)) backgrounds.push(posterUrl);
-        });
+        }
 
-        console.log(`🎨 [Experimental Menu] Preparing ${backgrounds.length} background options (backdrops + posters)`);
+        // Use the alternativeBackdrops from server which already combines backdrops + posters correctly
+        const backgrounds = movieData.alternativeBackdrops || [];
+        console.log(`🎨 [Experimental Menu] Using ${backgrounds.length} background options from server`);
 
         backgrounds.forEach((background, index) => {
-          const item = createOptionItem(background, 'background', index, index === selectedBackgroundIndex);
+          // Convert w1280 URLs to w500 for preview thumbnails while keeping the full URL for generation
+          const previewUrl = background.replace('/w1280/', '/w500/');
+          const item = createOptionItem(previewUrl, 'background', index, index === selectedBackgroundIndex);
+          // Store the actual generation URL as data attribute
+          item.dataset.fullUrl = background;
           backgroundOptionsDiv.appendChild(item);
         });
 
@@ -783,7 +792,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Fixed order for experimental
         contentOrder = ['logo', 'credits', 'rating', 'tags', 'watched-date'];
         metadataSettings = {
-          showLogo: true, // Always show logo/title in experimental
+          showLogo: document.getElementById('exp-show-logo').checked,
           showCredits: document.getElementById('exp-show-credits').checked,
           showRating: document.getElementById('exp-show-rating').checked,
           showTags: document.getElementById('exp-show-tags').checked,
