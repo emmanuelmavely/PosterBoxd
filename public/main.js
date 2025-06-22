@@ -261,8 +261,91 @@ document.addEventListener('DOMContentLoaded', () => {
       const display = document.getElementById(`${id}-value`);
       input.addEventListener('input', () => {
         display.textContent = parseFloat(input.value);
+        // Trigger regeneration with current selections preserved
+        if (currentSessionId && currentSettings) {
+          regenerateWithCurrentSettings();
+        }
       });
     });
+
+    // Add event listeners for checkboxes and other settings that should trigger regeneration
+    const settingInputs = [
+      'blur-backdrop', 'gradient-overlay', 'logo-alignment',
+      'show-title', 'show-year', 'show-genre', 'show-director', 'show-music', 
+      'show-actors', 'show-rating', 'show-heart', 'show-tags', 'show-runtime', 'show-watched-date',
+      'exp-show-credits', 'exp-show-rating', 'exp-show-tags', 'exp-show-watched-date'
+    ];
+
+    settingInputs.forEach(id => {
+      const input = document.getElementById(id);
+      if (input) {
+        input.addEventListener('change', () => {
+          if (currentSessionId && currentSettings) {
+            regenerateWithCurrentSettings();
+          }
+        });
+      }
+    });
+
+    // Function to regenerate with current settings while preserving selections
+    async function regenerateWithCurrentSettings() {
+      if (!currentSessionId) return;
+
+      // Update current settings with new values
+      const isExperimental = posterStyleSelect.value === 'experimental';
+      let contentOrder, metadataSettings;
+      
+      if (isExperimental) {
+        contentOrder = ['logo', 'credits', 'rating', 'tags', 'watched-date'];
+        metadataSettings = {
+          showLogo: true,
+          showCredits: document.getElementById('exp-show-credits').checked,
+          showRating: document.getElementById('exp-show-rating').checked,
+          showTags: document.getElementById('exp-show-tags').checked,
+          showWatchedDate: document.getElementById('exp-show-watched-date').checked
+        };
+      } else {
+        contentOrder = Array.from(document.querySelectorAll('#reorder-list li:not(.non-reorderable)')).map(li => li.dataset.id);
+        metadataSettings = {
+          showTitle: document.getElementById('show-title').checked,
+          showYear: document.getElementById('show-year').checked,
+          showGenre: document.getElementById('show-genre').checked,
+          showDirector: document.getElementById('show-director').checked,
+          showMusic: document.getElementById('show-music').checked,
+          showActors: document.getElementById('show-actors').checked,
+          showRating: document.getElementById('show-rating').checked,
+          showHeart: document.getElementById('show-heart').checked,
+          showTags: document.getElementById('show-tags').checked,
+          showRuntime: document.getElementById('show-runtime').checked,
+          showWatchedDate: document.getElementById('show-watched-date').checked
+        };
+      }
+
+      currentSettings = {
+        contentOrder: contentOrder,
+        ...metadataSettings,
+        blurBackdrop: document.getElementById('blur-backdrop').checked,
+        gradientOverlay: document.getElementById('gradient-overlay').checked,
+        backdropBrightness: parseFloat(document.getElementById('backdrop-brightness').value) / 100,
+        posterScale: parseFloat(document.getElementById('poster-scale').value),
+        footerScale: parseFloat(document.getElementById('footer-scale').value),
+        spacing: {
+          posterTop: parseInt(document.getElementById('poster-top').value),
+          titleBelowPoster: parseInt(document.getElementById('title-below-poster').value),
+          lineHeight: parseInt(document.getElementById('line-height').value),
+          betweenSections: parseInt(document.getElementById('between-sections').value),
+        },
+        posterStyle: posterStyleSelect.value,
+        experimentalSettings: {
+          creditsFontSize: document.getElementById('credits-font-size')?.value || 28,
+          logoAlignment: document.getElementById('logo-alignment')?.value || 'left',
+          logoScale: parseFloat(document.getElementById('logo-scale')?.value || 1.0)
+        }
+      };
+
+      // Call regenerateWithOption which preserves current selections
+      await regenerateWithOption();
+    }
 
     // Sortable list - exclude non-reorderable items
     Sortable.create(document.getElementById('reorder-list'), {
@@ -333,6 +416,19 @@ document.addEventListener('DOMContentLoaded', () => {
         // Show classic metadata options, hide experimental ones
         document.getElementById('classic-metadata-options').style.display = 'block';
         document.getElementById('experimental-metadata-options').style.display = 'none';
+      }
+
+      // Only regenerate if we have an active session and the style actually changed
+      if (currentSessionId && currentSettings) {
+        // Reset selections for experimental mode
+        if (isExperimental) {
+          selectedPosterIndex = -1;
+          selectedBackgroundIndex = 0;
+        } else {
+          selectedPosterIndex = 0;
+          selectedBackgroundIndex = 0;
+        }
+        regenerateWithCurrentSettings();
       }
     });    // Function to create option items
     function createOptionItem(src, type, index, isActive = false) {
