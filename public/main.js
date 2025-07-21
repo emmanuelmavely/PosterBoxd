@@ -221,6 +221,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const selectedPoster = document.getElementById('selected-poster');
       const selectedTitle = document.getElementById('selected-title');
       const selectedMeta = document.getElementById('selected-meta');
+      const seasonSelection = document.getElementById('season-selection');
       
       // Set poster
       if (item.poster_path) {
@@ -238,15 +239,124 @@ document.addEventListener('DOMContentLoaded', () => {
       selectedTitle.textContent = `${title} ${year}`;
       selectedMeta.textContent = mediaType;
       
+      // Show/hide season selection for TV series
+      if (item.media_type === 'tv') {
+        loadSeasons(item.id);
+        seasonSelection.style.display = 'block';
+      } else {
+        seasonSelection.style.display = 'none';
+      }
+      
       // Show the selected media display
       selectedMediaDiv.style.display = 'block';
+    }
+
+    // Load seasons for TV series
+    async function loadSeasons(seriesId) {
+      try {
+        const response = await fetch(`/tv/${seriesId}/seasons`);
+        const data = await response.json();
+        
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to load seasons');
+        }
+        
+        const seasonDropdown = document.getElementById('season-dropdown');
+        const loadSeasonBtn = document.getElementById('load-season');
+        
+        // Clear existing options (except "Entire Series")
+        seasonDropdown.innerHTML = '<option value="">Entire Series</option>';
+        
+        // Add season options
+        data.seasons.forEach(season => {
+          const option = document.createElement('option');
+          option.value = season.season_number;
+          option.textContent = `Season ${season.season_number} (${season.episode_count} episodes)`;
+          seasonDropdown.appendChild(option);
+        });
+        
+        // Show load button when season is selected
+        seasonDropdown.addEventListener('change', () => {
+          if (seasonDropdown.value) {
+            loadSeasonBtn.style.display = 'inline-block';
+          } else {
+            loadSeasonBtn.style.display = 'none';
+            document.getElementById('season-info').style.display = 'none';
+            // Clear season data from selected media
+            if (window.selectedMedia) {
+              delete window.selectedMedia.seasonData;
+              delete window.selectedMedia.selectedSeason;
+            }
+          }
+        });
+        
+      } catch (error) {
+        console.error('Error loading seasons:', error);
+      }
+    }
+
+    // Load specific season details
+    document.getElementById('load-season').addEventListener('click', async () => {
+      const seasonDropdown = document.getElementById('season-dropdown');
+      const seasonNumber = seasonDropdown.value;
+      const seriesId = window.selectedMedia?.id;
+      
+      if (!seasonNumber || !seriesId) return;
+      
+      try {
+        const response = await fetch(`/tv/${seriesId}/season/${seasonNumber}`);
+        const data = await response.json();
+        
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to load season details');
+        }
+        
+        // Store season data
+        window.selectedMedia.seasonData = data;
+        window.selectedMedia.selectedSeason = parseInt(seasonNumber);
+        
+        // Display season info
+        displaySeasonInfo(data.seasonDetails);
+        
+      } catch (error) {
+        console.error('Error loading season details:', error);
+        alert('Failed to load season details');
+      }
+    });
+
+    // Display season information
+    function displaySeasonInfo(seasonDetails) {
+      const seasonInfoDiv = document.getElementById('season-info');
+      
+      const airDate = seasonDetails.air_date ? new Date(seasonDetails.air_date).getFullYear() : 'TBA';
+      
+      seasonInfoDiv.innerHTML = `
+        <h4>Season ${seasonDetails.season_number}</h4>
+        <p><strong>Episodes:</strong> ${seasonDetails.episodes?.length || seasonDetails.episode_count || 'Unknown'}</p>
+        <p><strong>Air Date:</strong> ${airDate}</p>
+        <div class="season-meta">
+          <span>Season ${seasonDetails.season_number}</span>
+          <span>${seasonDetails.episodes?.length || seasonDetails.episode_count || 0} Episodes</span>
+          <span>${airDate}</span>
+        </div>
+        ${seasonDetails.overview ? `<p><strong>Overview:</strong> ${seasonDetails.overview}</p>` : ''}
+      `;
+      
+      seasonInfoDiv.style.display = 'block';
     }
 
     // Handle change selection button
     document.getElementById('change-selection').addEventListener('click', () => {
       document.getElementById('selected-media').style.display = 'none';
+      document.getElementById('season-selection').style.display = 'none';
       document.getElementById('search-results').style.display = 'block';
       document.getElementById('custom-fields').style.display = 'none';
+      
+      // Clear season data
+      if (window.selectedMedia) {
+        delete window.selectedMedia.seasonData;
+        delete window.selectedMedia.selectedSeason;
+      }
     });
 
     // Live update slider labels

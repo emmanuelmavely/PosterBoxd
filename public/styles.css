@@ -872,3 +872,162 @@ div.search-result-poster {
   opacity: 0.7;
   pointer-events: none;
 }
+
+/* Season Selection Styles */
+.season-selection {
+  background: rgba(44, 44, 46, 0.9);
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin: 1rem 0;
+  border: 1px solid #3a3a3c;
+}
+
+.season-selection h3 {
+  margin: 0 0 0.5rem 0;
+  color: #fff;
+  font-size: 1.1rem;
+}
+
+.season-note {
+  font-size: 0.9rem;
+  color: #999;
+  margin-bottom: 1rem;
+  line-height: 1.4;
+}
+
+.season-selector {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.season-selector label {
+  color: #fff;
+  font-weight: 500;
+  margin: 0;
+}
+
+#season-dropdown {
+  background: #1c1c1e;
+  border: 1px solid #3a3a3c;
+  border-radius: 8px;
+  color: #fff;
+  padding: 0.5rem 1rem;
+  font-size: 1rem;
+  min-width: 150px;
+}
+
+#season-dropdown option {
+  background: #1c1c1e;
+  color: #fff;
+}
+
+#load-season {
+  background: #0a84ff;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 0.5rem 1rem;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+#load-season:hover {
+  background: #0056b3;
+}
+
+.season-info {
+  background: rgba(28, 28, 30, 0.8);
+  border-radius: 8px;
+  padding: 1rem;
+  border: 1px solid #3a3a3c;
+}
+
+.season-info h4 {
+  margin: 0 0 0.5rem 0;
+  color: #0a84ff;
+  font-size: 1rem;
+}
+
+.season-info p {
+  margin: 0.25rem 0;
+  color: #ccc;
+  font-size: 0.9rem;
+}
+
+.season-info .season-meta {
+  display: flex;
+  gap: 1rem;
+  margin-top: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.season-info .season-meta span {
+  background: rgba(58, 58, 60, 0.8);
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  color: #fff;
+}
+
+/* Improved Settings Panel Styling */
+.tab-description {
+  font-size: 0.9rem;
+  color: #999;
+  margin: 0 0 1.5rem 0;
+  line-height: 1.4;
+  font-style: italic;
+}
+
+.settings-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 1.5rem 0;
+}
+
+.settings-list li {
+  display: flex;
+  align-items: center;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid rgba(58, 58, 60, 0.3);
+}
+
+.settings-list li:last-child {
+  border-bottom: none;
+}
+
+/* Settings tab content */
+.tab-content h3 {
+  color: #fff;
+  font-size: 1rem;
+  margin: 1.5rem 0 1rem 0;
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid #0a84ff;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.tab-content h3:first-child {
+  margin-top: 0;
+}
+
+/* Better organization for settings sections */
+.settings-section {
+  background: rgba(28, 28, 30, 0.5);
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  border: 1px solid rgba(58, 58, 60, 0.3);
+}
+
+.settings-section h4 {
+  color: #0a84ff;
+  font-size: 0.9rem;
+  margin: 0 0 0.75rem 0;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
