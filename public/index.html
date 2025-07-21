@@ -85,6 +85,20 @@
           </div>
         </div>
         
+        <!-- Season selection for TV series -->
+        <div id="season-selection" class="season-selection" style="display: none;">
+          <h3>📺 Select Season</h3>
+          <p class="season-note">Choose a specific season to focus on, or leave unselected for the entire series.</p>
+          <div class="season-selector">
+            <label for="season-dropdown">Season:</label>
+            <select id="season-dropdown">
+              <option value="">Entire Series</option>
+            </select>
+            <button type="button" id="load-season" style="display: none;">Load Season Details</button>
+          </div>
+          <div id="season-info" class="season-info" style="display: none;"></div>
+        </div>
+        
         <div id="custom-fields" style="display: none;">
           <div style="margin-top: 1.5rem;"></div>
           <label for="custom-rating" style="padding-bottom: 0.5rem; align-items: flex-start;">Rating:</label>
@@ -113,24 +127,31 @@
 
         <!-- Tab Navigation -->
         <div class="settings-tabs">
-          <button type="button" class="tab-button active" data-tab="metadata">Metadata</button>
-          <button type="button" class="tab-button" data-tab="visual">Visual</button>
+          <button type="button" class="tab-button active" data-tab="content">Content</button>
+          <button type="button" class="tab-button" data-tab="layout">Layout</button>
+          <button type="button" class="tab-button" data-tab="effects">Effects</button>
         </div>
 
-        <!-- Metadata Tab -->
-        <div class="tab-content active" id="metadata-tab">
-          <h2>🛠️ Customize Metadata Order</h2>
+        <!-- Content Tab -->
+        <div class="tab-content active" id="content-tab">
+          <h2>📋 Content & Metadata</h2>
+          <p class="tab-description">Choose which information to display and customize the order</p>
           
           <!-- Classic mode metadata options -->
           <div id="classic-metadata-options">
+            <h3>🎬 Information Fields</h3>
             <ul id="reorder-list">
               <li data-id="title"><span class="drag-handle">☰</span><input type="checkbox" id="show-title" checked> Title</li>
               <li data-id="year"><span class="drag-handle">☰</span><input type="checkbox" id="show-year" checked> Year</li>
               <li data-id="director"><span class="drag-handle">☰</span><input type="checkbox" id="show-director" checked> Director</li>
-              <li data-id="music"><span class="drag-handle">☰</span><input type="checkbox" id="show-music"> Music</li>
               <li data-id="actors"><span class="drag-handle">☰</span><input type="checkbox" id="show-actors" checked> Actors</li>
               <li data-id="genre"><span class="drag-handle">☰</span><input type="checkbox" id="show-genre" checked> Genre</li>
               <li data-id="runtime"><span class="drag-handle">☰</span><input type="checkbox" id="show-runtime"> Run Time</li>
+              <li data-id="music"><span class="drag-handle">☰</span><input type="checkbox" id="show-music"> Music</li>
+            </ul>
+            
+            <h3>⭐ User Content</h3>
+            <ul class="settings-list">
               <li data-id="rating"><span class="drag-handle">☰</span><input type="checkbox" id="show-rating" checked> Rating</li>
               <li data-id="heart" class="non-reorderable"><span class="drag-handle disabled">❤️</span><input type="checkbox" id="show-heart"> Heart (if liked)</li>
               <li data-id="tags"><span class="drag-handle">☰</span><input type="checkbox" id="show-tags" checked> Tags</li>
@@ -151,17 +172,14 @@
           </div>
         </div>
 
-        <!-- Visual Tab -->
-        <div class="tab-content" id="visual-tab">
-          <h2>🎨 Visual Settings</h2>
-          <label><input type="checkbox" id="blur-backdrop" checked> Blur Backdrop</label>
-          <label><input type="checkbox" id="gradient-overlay" checked> Gradient Overlay (Bottom to Top)</label>
-
-          <label>Backdrop Brightness: <span id="backdrop-brightness-value">60</span>%</label>
-          <input type="range" id="backdrop-brightness" min="0" max="100" value="60">
-
+        <!-- Layout Tab -->
+        <div class="tab-content" id="layout-tab">
+          <h2>📐 Layout & Spacing</h2>
+          <p class="tab-description">Adjust positioning, scaling, and spacing of elements</p>
+          
           <!-- Poster-only settings (hidden in Experimental mode) -->
           <div class="poster-only-setting">
+            <h3>🖼️ Poster Settings</h3>
             <label>Poster Scale: <span id="poster-scale-value">1.0</span>x</label>
             <input type="range" id="poster-scale" min="0.5" max="2.0" step="0.1" value="1.0">
             
@@ -174,27 +192,43 @@
           
           <!-- Experimental-only settings (shown only in Experimental mode) -->
           <div class="experimental-only-setting" style="display: none;">
+            <h3>🏷️ Logo Settings</h3>
             <label>Logo Scale: <span id="logo-scale-value">1.0</span>x</label>
             <input type="range" id="logo-scale" min="0.5" max="2.0" step="0.1" value="1.0">
-            
-            <label>Credits Font Size: <span id="credits-font-size-value">28</span>px</label>
-            <input type="range" id="credits-font-size" min="20" max="36" step="1" value="28">
             
             <label for="logo-alignment">Logo Alignment:</label>
             <select id="logo-alignment">
               <option value="left">Left-aligned</option>
               <option value="center">Centered</option>
             </select>
+            
+            <label>Credits Font Size: <span id="credits-font-size-value">28</span>px</label>
+            <input type="range" id="credits-font-size" min="20" max="36" step="1" value="28">
           </div>
           
-          <label>Footer Scale: <span id="footer-scale-value">1.0</span>x</label>
-          <input type="range" id="footer-scale" min="0.5" max="2.0" step="0.1" value="1.0">
-
+          <h3>📏 Typography & Spacing</h3>
           <label>Line Height: <span id="line-height-value">72</span>px</label>
           <input type="range" id="line-height" min="20" max="120" value="72">
 
           <label>Between Sections: <span id="between-sections-value">60</span>px</label>
           <input type="range" id="between-sections" min="10" max="150" value="60">
+          
+          <h3>🔽 Footer</h3>
+          <label>Footer Scale: <span id="footer-scale-value">1.0</span>x</label>
+          <input type="range" id="footer-scale" min="0.5" max="2.0" step="0.1" value="1.0">
+        </div>
+
+        <!-- Effects Tab -->
+        <div class="tab-content" id="effects-tab">
+          <h2>🎨 Visual Effects</h2>
+          <p class="tab-description">Control background effects and visual enhancements</p>
+          
+          <h3>🌅 Background Effects</h3>
+          <label><input type="checkbox" id="blur-backdrop" checked> Blur Backdrop</label>
+          <label><input type="checkbox" id="gradient-overlay" checked> Gradient Overlay (Bottom to Top)</label>
+
+          <label>Backdrop Brightness: <span id="backdrop-brightness-value">60</span>%</label>
+          <input type="range" id="backdrop-brightness" min="0" max="100" value="60">
         </div>
       </details>
 

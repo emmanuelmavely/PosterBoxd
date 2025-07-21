@@ -7,7 +7,6 @@ import sharp from 'sharp';
 import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import ApiCache from './lib/cache.js';
 
 dotenv.config();
 
@@ -25,9 +24,6 @@ app.use(express.static(path.join(__dirname, 'public')));
 // Store movie data in memory (in production, use Redis or database)
 const movieDataStore = new Map();
 
-// Initialize API cache for better performance
-const apiCache = new ApiCache(300000); // 5 minutes TTL
-
 const TMDB_API_KEY = process.env.TMDB_API_KEY;
 
 // Search endpoint
@@ -41,34 +37,6 @@ app.post('/search-media', async (req, res) => {
   });
   
   try {
-    // Check cache first
-    const cacheKey = `search:${query.toLowerCase()}`;
-    const cachedResult = apiCache.get(cacheKey);
-    if (cachedResult) {
-      console.log('🚀 Cache hit! Returning cached results');
-      res.json({ results: cachedResult });
-      return;
-    }
-    
-    // Use mock data if API key is dummy (for testing)
-    if (TMDB_API_KEY === 'dummy_key_for_testing') {
-      console.log('🔄 Using mock data for testing');
-      const { mockSearchResults } = await import('./lib/mock-data.js');
-      
-      // Filter mock results based on query
-      const filteredResults = mockSearchResults.filter(item => 
-        (item.title || item.name).toLowerCase().includes(query.toLowerCase())
-      );
-      
-      console.log(`📊 Mock search results: ${filteredResults.length} items found`);
-      
-      // Cache the results
-      apiCache.set(cacheKey, filteredResults);
-      
-      res.json({ results: filteredResults });
-      return;
-    }
-    
     console.log('\n📡 TMDB API Requests:');
     console.log('  → Movie Search:', `https://api.themoviedb.org/3/search/movie?query=${encodeURIComponent(query)}`);
     console.log('  → TV Search:', `https://api.themoviedb.org/3/search/tv?query=${encodeURIComponent(query)}`);
@@ -175,116 +143,6 @@ app.post('/search-media', async (req, res) => {
     console.error('\n❌ SEARCH ERROR:', error);
     res.status(500).json({ error: 'Search failed' });
   }
-});
-
-// Get seasons for a TV series
-app.get('/tv/:id/seasons', async (req, res) => {
-  const { id } = req.params;
-  
-  try {
-    console.log(`\n📺 === FETCHING SEASONS FOR TV SERIES ${id} ===`);
-    
-    // Use mock data if API key is dummy (for testing)
-    if (TMDB_API_KEY === 'dummy_key_for_testing') {
-      console.log('🔄 Using mock season data for testing');
-      const { mockTvSeries } = await import('./lib/mock-data.js');
-      
-      if (id == mockTvSeries.id) {
-        console.log(`✅ Found ${mockTvSeries.seasons.length} seasons for "${mockTvSeries.name}"`);
-        res.json({ 
-          series_name: mockTvSeries.name,
-          seasons: mockTvSeries.seasons
-        });
-        return;
-      } else {
-        return res.status(404).json({ error: 'Series not found in mock data' });
-      }
-    }
-    
-    const details = await fetch(`https://api.themoviedb.org/3/tv/${id}?api_key=${TMDB_API_KEY}`).then(r => r.json());
-    
-    if (!details.seasons) {
-      return res.status(404).json({ error: 'No seasons found' });
-    }
-    
-    // Filter out season 0 (specials) and format season data
-    const seasons = details.seasons
-      .filter(season => season.season_number > 0)
-      .map(season => ({
-        id: season.id,
-        season_number: season.season_number,
-        name: season.name,
-        episode_count: season.episode_count,
-        air_date: season.air_date,
-        poster_path: season.poster_path,
-        overview: season.overview
-      }));
-    
-    console.log(`✅ Found ${seasons.length} seasons for "${details.name}"`);
-    
-    res.json({ 
-      series_name: details.name,
-      seasons 
-    });
-  } catch (error) {
-    console.error('❌ Error fetching seasons:', error);
-    res.status(500).json({ error: 'Failed to fetch seasons', details: error.message });
-  }
-});
-
-// Get specific season details
-app.get('/tv/:seriesId/season/:seasonNumber', async (req, res) => {
-  const { seriesId, seasonNumber } = req.params;
-  
-  try {
-    console.log(`\n🎬 === FETCHING SEASON ${seasonNumber} DETAILS ===`);
-    
-    // Use mock data if API key is dummy (for testing)
-    if (TMDB_API_KEY === 'dummy_key_for_testing') {
-      console.log('🔄 Using mock season details for testing');
-      const { mockSeasonDetails } = await import('./lib/mock-data.js');
-      
-      const seasonData = mockSeasonDetails[seasonNumber];
-      if (seasonData) {
-        console.log(`✅ Season details retrieved for Season ${seasonNumber}`);
-        res.json(seasonData);
-        return;
-      } else {
-        return res.status(404).json({ error: 'Season not found in mock data' });
-      }
-    }
-    
-    const [seasonDetails, seasonCredits] = await Promise.all([
-      fetch(`https://api.themoviedb.org/3/tv/${seriesId}/season/${seasonNumber}?api_key=${TMDB_API_KEY}`).then(r => r.json()),
-      fetch(`https://api.themoviedb.org/3/tv/${seriesId}/season/${seasonNumber}/credits?api_key=${TMDB_API_KEY}`).then(r => r.json())
-    ]);
-    
-    console.log(`✅ Season details retrieved for Season ${seasonNumber}`);
-    
-    res.json({ 
-      seasonDetails, 
-      seasonCredits 
-    });
-  } catch (error) {
-    console.error('❌ Error fetching season details:', error);
-    res.status(500).json({ error: 'Failed to fetch season details', details: error.message });
-  }
-});
-
-// Cache status endpoint for monitoring
-app.get('/cache/status', (req, res) => {
-  res.json({
-    size: apiCache.size(),
-    ttl: apiCache.ttl,
-    timestamp: new Date().toISOString()
-  });
-});
-
-// Clear cache endpoint
-app.post('/cache/clear', (req, res) => {
-  apiCache.clear();
-  console.log('🧹 Cache cleared');
-  res.json({ message: 'Cache cleared successfully' });
 });
 
 function escapeXml(unsafe) {
