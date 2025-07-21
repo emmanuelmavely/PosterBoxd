@@ -7,6 +7,7 @@ import sharp from 'sharp';
 import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import ApiCache from './lib/cache.js';
 
 dotenv.config();
 
@@ -24,6 +25,9 @@ app.use(express.static(path.join(__dirname, 'public')));
 // Store movie data in memory (in production, use Redis or database)
 const movieDataStore = new Map();
 
+// Initialize API cache for better performance
+const apiCache = new ApiCache(300000); // 5 minutes TTL
+
 const TMDB_API_KEY = process.env.TMDB_API_KEY;
 
 // Search endpoint
@@ -37,6 +41,15 @@ app.post('/search-media', async (req, res) => {
   });
   
   try {
+    // Check cache first
+    const cacheKey = `search:${query.toLowerCase()}`;
+    const cachedResult = apiCache.get(cacheKey);
+    if (cachedResult) {
+      console.log('🚀 Cache hit! Returning cached results');
+      res.json({ results: cachedResult });
+      return;
+    }
+    
     // Use mock data if API key is dummy (for testing)
     if (TMDB_API_KEY === 'dummy_key_for_testing') {
       console.log('🔄 Using mock data for testing');
@@ -48,6 +61,10 @@ app.post('/search-media', async (req, res) => {
       );
       
       console.log(`📊 Mock search results: ${filteredResults.length} items found`);
+      
+      // Cache the results
+      apiCache.set(cacheKey, filteredResults);
+      
       res.json({ results: filteredResults });
       return;
     }
@@ -252,6 +269,22 @@ app.get('/tv/:seriesId/season/:seasonNumber', async (req, res) => {
     console.error('❌ Error fetching season details:', error);
     res.status(500).json({ error: 'Failed to fetch season details', details: error.message });
   }
+});
+
+// Cache status endpoint for monitoring
+app.get('/cache/status', (req, res) => {
+  res.json({
+    size: apiCache.size(),
+    ttl: apiCache.ttl,
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Clear cache endpoint
+app.post('/cache/clear', (req, res) => {
+  apiCache.clear();
+  console.log('🧹 Cache cleared');
+  res.json({ message: 'Cache cleared successfully' });
 });
 
 function escapeXml(unsafe) {
