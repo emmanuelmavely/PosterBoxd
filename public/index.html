@@ -33,243 +33,255 @@
       <img src="assets/posterBoxd.png" alt="PosterBoxd Logo" class="logo">
     </div>
 
+    <div class="step-header">
+      <div class="breadcrumbs" role="navigation" aria-label="Progress">
+        <span class="crumb active" data-step="1" data-label="Search"></span>
+        <span class="crumb" data-step="2" data-label="Design"></span>
+        <span class="crumb" data-step="3" data-label="Details"></span>
+        <span class="crumb" data-step="4" data-label="Poster"></span>
+      </div>
+    </div>
+
     <form id="image-form">
-      <!-- Unified Input Card -->
-      <div class="card" id="input-card">
-        <label for="media-input" class="input-label">Get started</label>
-        <div class="input-row">
-          <input type="text" id="media-input" placeholder="Paste Letterboxd share text or type a movie/series name..." />
-          <button type="submit" id="get-started-btn">Generate</button>
-        </div>
-        <p class="input-help">Tip: Press Enter to search titles. Paste a Letterboxd share to generate instantly.</p>
-      </div>
-
-      <!-- Search Results (shown after typing a movie name) -->
-      <div id="search-results" class="search-results" style="display: none;"></div>
-      
-      <!-- Selected media display -->
-      <div id="selected-media" class="selected-media" style="display: none;">
-        <div class="selected-media-content">
-          <img id="selected-poster" class="selected-poster" alt="Selected media poster">
-          <div class="selected-info">
-            <div class="selected-title" id="selected-title"></div>
-            <div class="selected-meta" id="selected-meta"></div>
-          </div>
-          <button type="button" class="change-selection-btn" id="change-selection">Change</button>
-        </div>
-      </div>
-
-      <!-- Custom fields (shown after media selection) -->
-      <div id="custom-fields" class="card" style="display: none;">
-        <div style="margin-top: 0;"></div>
-        <label for="custom-rating" style="padding-bottom: 0.5rem; align-items: flex-start;">Rating:</label>
-        <div class="rating-container">
-          <input type="range" id="custom-rating" class="rating-slider" min="0" max="10" step="0.5" value="0">
-          <div class="rating-stars">
-            <span class="stars-display">☆☆☆☆☆</span>
-          </div>
-        </div>
-
-        <!-- TV Season/Episode Selector (shown only for TV series) -->
-        <div id="tv-episode-selector" class="tv-selector" style="display: none;">
-          <label for="season-select">Season:</label>
-          <select id="season-select">
-            <option value="">All seasons</option>
-          </select>
-
-          <label for="episode-select">Episode:</label>
-          <select id="episode-select" disabled>
-            <option value="">All episodes</option>
-          </select>
-          <p class="input-help">Choose a season for a season-only poster, or pick an episode for a specific episode.</p>
-        </div>
-        
-        <label for="custom-tags">Hashtags:</label>
-        <input type="text" id="custom-tags" placeholder="Enter hashtags separated by commas..." />
-        
-        <label for="custom-username">Username:</label>
-        <input type="text" id="custom-username" placeholder="Enter your username..." />
-        
-        <label for="custom-watched-date">Watched Date (optional):</label>
-        <input type="date" id="custom-watched-date" />
-        
-        <button type="submit">Generate Image</button>
-      </div>
-
-      <!-- Poster Style Selector -->
-      <div class="card" style="margin-bottom: 0;">
-        <div class="poster-style-row">
-          <label id="poster-style-label">Poster Style</label>
-          <div class="poster-style-grid" role="group" aria-labelledby="poster-style-label">
-            <button type="button" class="style-option active" data-style="classic" aria-pressed="true">
-              <span class="style-preview">
-                <svg width="300" height="533" viewBox="0 0 300 533" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <rect width="300" height="533" fill="#F3F4F6"/>
-                  <rect x="75" y="80" width="150" height="220" rx="8" fill="#D1D5DB"/>
-                  <rect x="80" y="320" width="140" height="16" rx="4" fill="#9CA3AF"/>
-                  <rect x="120" y="345" width="60" height="10" rx="2" fill="#D1D5DB"/>
-                  <rect x="60" y="370" width="180" height="10" rx="2" fill="#D1D5DB"/>
-                  <rect x="40" y="390" width="220" height="10" rx="2" fill="#D1D5DB"/>
-                  <rect x="90" y="415" width="120" height="8" rx="2" fill="#E5E7EB"/>
-                  <g transform="translate(110, 440)">
-                    <circle cx="0" cy="0" r="6" fill="#D1D5DB"/>
-                    <circle cx="20" cy="0" r="6" fill="#D1D5DB"/>
-                    <circle cx="40" cy="0" r="6" fill="#D1D5DB"/>
-                    <circle cx="60" cy="0" r="6" fill="#D1D5DB"/>
-                    <circle cx="80" cy="0" r="6" fill="#D1D5DB"/>
-                  </g>
-                </svg>
-              </span>
-              <span class="style-label">Classic</span>
+      <div class="step" id="step-1">
+        <div class="card" id="input-card">
+          <label for="media-input" class="sr-only">Search</label>
+          <div class="input-row search-row">
+            <input type="text" id="media-input" placeholder="Letterboxd Link/Movie/TV Series" />
+            <button type="button" id="step1-search" class="icon-button" aria-label="Search">
+              <i class="fa-solid fa-magnifying-glass"></i>
             </button>
-            <button type="button" class="style-option" data-style="experimental" aria-pressed="false">
-              <span class="style-preview">
+          </div>
+          <p class="input-help">Paste a Letterboxd share link to fetch it directly.</p>
+        </div>
+
+        <div id="search-results" class="search-results" style="display: none;"></div>
+      </div>
+
+      <div class="step" id="step-2" style="display: none;">
+        <div id="selected-media" class="selected-media" style="display: none;">
+          <div class="selected-media-content">
+            <img id="selected-poster" class="selected-poster" alt="Selected media poster">
+            <div class="selected-info">
+              <div class="selected-title" id="selected-title"></div>
+              <div class="selected-meta" id="selected-meta"></div>
+            </div>
+            <button type="button" class="change-selection-btn" id="change-selection">Change</button>
+          </div>
+        </div>
+
+        <div class="card" style="margin-bottom: 0;">
+          <div class="poster-style-row">
+            <label id="poster-style-label">Poster Style</label>
+            <div class="poster-style-grid" role="group" aria-labelledby="poster-style-label">
+              <button type="button" class="style-option active" data-style="classic" aria-pressed="true">
+                <span class="style-preview">
                   <svg width="300" height="533" viewBox="0 0 300 533" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <rect width="300" height="533" fill="#F3F4F6"/>
-                  <rect x="20" y="280" width="120" height="40" rx="4" fill="#D1D5DB"/>
-                  <rect x="20" y="340" width="160" height="10" rx="2" fill="#D1D5DB"/>
-                  <rect x="20" y="360" width="220" height="10" rx="2" fill="#D1D5DB"/>
-                  <rect x="20" y="380" width="240" height="10" rx="2" fill="#D1D5DB"/>
-                  <rect x="20" y="400" width="180" height="10" rx="2" fill="#D1D5DB"/>
-                  <rect x="20" y="420" width="200" height="10" rx="2" fill="#D1D5DB"/>
-                  <circle cx="25" cy="450" r="8" fill="#D1D5DB"/>
-                  <circle cx="45" cy="450" r="8" fill="#D1D5DB"/>
-                  <circle cx="65" cy="450" r="8" fill="#D1D5DB"/>
-                  <circle cx="85" cy="450" r="8" fill="#D1D5DB"/>
-                  <circle cx="105" cy="450" r="8" fill="#D1D5DB"/>
-                  <rect x="110" y="500" width="80" height="8" rx="2" fill="#E5E7EB"/>
-                </svg>
-              </span>
-              <span class="style-label">Experimental</span>
-            </button>
+                    <rect width="300" height="533" fill="#F3F4F6"/>
+                    <rect x="75" y="80" width="150" height="220" rx="8" fill="#D1D5DB"/>
+                    <rect x="80" y="320" width="140" height="16" rx="4" fill="#9CA3AF"/>
+                    <rect x="120" y="345" width="60" height="10" rx="2" fill="#D1D5DB"/>
+                    <rect x="60" y="370" width="180" height="10" rx="2" fill="#D1D5DB"/>
+                    <rect x="40" y="390" width="220" height="10" rx="2" fill="#D1D5DB"/>
+                    <rect x="90" y="415" width="120" height="8" rx="2" fill="#E5E7EB"/>
+                    <g transform="translate(110, 440)">
+                      <circle cx="0" cy="0" r="6" fill="#D1D5DB"/>
+                      <circle cx="20" cy="0" r="6" fill="#D1D5DB"/>
+                      <circle cx="40" cy="0" r="6" fill="#D1D5DB"/>
+                      <circle cx="60" cy="0" r="6" fill="#D1D5DB"/>
+                      <circle cx="80" cy="0" r="6" fill="#D1D5DB"/>
+                    </g>
+                  </svg>
+                </span>
+                <span class="style-label">Classic</span>
+              </button>
+              <button type="button" class="style-option" data-style="experimental" aria-pressed="false">
+                <span class="style-preview">
+                    <svg width="300" height="533" viewBox="0 0 300 533" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="300" height="533" fill="#F3F4F6"/>
+                    <rect x="20" y="280" width="120" height="40" rx="4" fill="#D1D5DB"/>
+                    <rect x="20" y="340" width="160" height="10" rx="2" fill="#D1D5DB"/>
+                    <rect x="20" y="360" width="220" height="10" rx="2" fill="#D1D5DB"/>
+                    <rect x="20" y="380" width="240" height="10" rx="2" fill="#D1D5DB"/>
+                    <rect x="20" y="400" width="180" height="10" rx="2" fill="#D1D5DB"/>
+                    <rect x="20" y="420" width="200" height="10" rx="2" fill="#D1D5DB"/>
+                    <circle cx="25" cy="450" r="8" fill="#D1D5DB"/>
+                    <circle cx="45" cy="450" r="8" fill="#D1D5DB"/>
+                    <circle cx="65" cy="450" r="8" fill="#D1D5DB"/>
+                    <circle cx="85" cy="450" r="8" fill="#D1D5DB"/>
+                    <circle cx="105" cy="450" r="8" fill="#D1D5DB"/>
+                    <rect x="110" y="500" width="80" height="8" rx="2" fill="#E5E7EB"/>
+                  </svg>
+                </span>
+                <span class="style-label">Experimental</span>
+              </button>
+            </div>
           </div>
+        </div>
+
+        <div class="step-actions">
+          <button type="button" id="step2-next" class="primary next-button">
+            Next <i class="fa-solid fa-arrow-right"></i>
+          </button>
+          <button type="button" id="step2-generate" class="primary" style="display: none;">Generate Poster</button>
         </div>
       </div>
 
-      <details class="card details" id="settings-panel">
-        <summary>⚙️ Advanced Settings</summary>
-
-        <!-- Tab Navigation -->
-        <div class="settings-tabs">
-          <button type="button" class="tab-button active" data-tab="metadata">Metadata</button>
-          <button type="button" class="tab-button" data-tab="visual">Visual</button>
-        </div>
-
-        <!-- Metadata Tab -->
-        <div class="tab-content active" id="metadata-tab">
-          <h2>🛠️ Customize Metadata Order</h2>
-          
-          <!-- Classic mode metadata options -->
-          <div id="classic-metadata-options">
-            <ul id="reorder-list">
-              <li data-id="title"><span class="drag-handle">☰</span><input type="checkbox" id="show-title" checked> Title</li>
-              <li data-id="year"><span class="drag-handle">☰</span><input type="checkbox" id="show-year" checked> Year</li>
-              <li data-id="director"><span class="drag-handle">☰</span><input type="checkbox" id="show-director" checked> Director</li>
-              <li data-id="music"><span class="drag-handle">☰</span><input type="checkbox" id="show-music"> Music</li>
-              <li data-id="actors"><span class="drag-handle">☰</span><input type="checkbox" id="show-actors" checked> Actors</li>
-              <li data-id="genre"><span class="drag-handle">☰</span><input type="checkbox" id="show-genre" checked> Genre</li>
-              <li data-id="runtime"><span class="drag-handle">☰</span><input type="checkbox" id="show-runtime"> Run Time</li>
-              <li data-id="rating"><span class="drag-handle">☰</span><input type="checkbox" id="show-rating" checked> Rating</li>
-              <li data-id="heart" class="non-reorderable"><span class="drag-handle disabled">❤️</span><input type="checkbox" id="show-heart"> Heart (if liked)</li>
-              <li data-id="tags"><span class="drag-handle">☰</span><input type="checkbox" id="show-tags" checked> Tags</li>
-              <li data-id="watched-date" class="non-reorderable"><span class="drag-handle disabled">📅</span><input type="checkbox" id="show-watched-date" checked> Watched Date</li>
-            </ul>
+      <div class="step" id="step-3" style="display: none;">
+        <div id="custom-fields" class="card">
+          <div style="margin-top: 0;"></div>
+          <label for="custom-rating" style="padding-bottom: 0.5rem; align-items: flex-start;">Rating:</label>
+          <div class="rating-container">
+            <input type="range" id="custom-rating" class="rating-slider" min="0" max="10" step="0.5" value="0">
+            <div class="rating-stars">
+              <span class="stars-display">☆☆☆☆☆</span>
+            </div>
           </div>
-          
-          <!-- Experimental mode metadata options -->
-          <div id="experimental-metadata-options" style="display: none;">
-            <ul id="experimental-reorder-list">
-              <li data-id="logo"><span class="drag-handle disabled">🏷️</span><input type="checkbox" id="exp-show-logo" checked> Movie Logo</li>
-              <li data-id="credits"><span class="drag-handle disabled">🎬</span><input type="checkbox" id="exp-show-credits" checked> Credits</li>
-              <li data-id="rating"><span class="drag-handle disabled">⭐</span><input type="checkbox" id="exp-show-rating" checked> Rating Stars</li>
-              <li data-id="tags" class="non-reorderable"><span class="drag-handle disabled">#️⃣</span><input type="checkbox" id="exp-show-tags"> Hashtags</li>
-              <li data-id="watched-date" class="non-reorderable"><span class="drag-handle disabled">📅</span><input type="checkbox" id="exp-show-watched-date"> Watched Date</li>
-            </ul>
-            <p class="note">Note: In Experimental mode, elements appear in a fixed order with the logo at top.</p>
-          </div>
-        </div>
 
-        <!-- Visual Tab -->
-        <div class="tab-content" id="visual-tab">
-          <h2>🎨 Visual Settings</h2>
-          <label><input type="checkbox" id="blur-backdrop" checked> Blur Backdrop</label>
-          <label><input type="checkbox" id="gradient-overlay" checked> Gradient Overlay (Bottom to Top)</label>
-
-          <label>Backdrop Brightness: <span id="backdrop-brightness-value">60</span>%</label>
-          <input type="range" id="backdrop-brightness" min="0" max="100" value="60">
-
-          <!-- Poster-only settings (hidden in Experimental mode) -->
-          <div class="poster-only-setting">
-            <label>Poster Scale: <span id="poster-scale-value">1.0</span>x</label>
-            <input type="range" id="poster-scale" min="0.5" max="2.0" step="0.1" value="1.0">
-            
-            <label>Poster Top Margin: <span id="poster-top-value">240</span>px</label>
-            <input type="range" id="poster-top" min="50" max="400" value="240">
-            
-            <label>Title Below Poster: <span id="title-below-poster-value">60</span>px</label>
-            <input type="range" id="title-below-poster" min="10" max="200" value="60">
-          </div>
-          
-          <!-- Experimental-only settings (shown only in Experimental mode) -->
-          <div class="experimental-only-setting" style="display: none;">
-            <label>Logo Scale: <span id="logo-scale-value">1.0</span>x</label>
-            <input type="range" id="logo-scale" min="0.5" max="2.0" step="0.1" value="1.0">
-            
-            <label>Credits Font Size: <span id="credits-font-size-value">28</span>px</label>
-            <input type="range" id="credits-font-size" min="20" max="36" step="1" value="28">
-            
-            <label for="logo-alignment">Logo Alignment:</label>
-            <select id="logo-alignment">
-              <option value="left">Left-aligned</option>
-              <option value="center">Centered</option>
+          <div id="tv-episode-selector" class="tv-selector" style="display: none;">
+            <label for="season-select">Season:</label>
+            <select id="season-select">
+              <option value="">All seasons</option>
             </select>
+
+            <label for="episode-select">Episode:</label>
+            <select id="episode-select" disabled>
+              <option value="">All episodes</option>
+            </select>
+            <p class="input-help">Choose a season for a season-only poster, or pick an episode for a specific episode.</p>
           </div>
           
-          <label>Footer Scale: <span id="footer-scale-value">1.0</span>x</label>
-          <input type="range" id="footer-scale" min="0.5" max="2.0" step="0.1" value="1.0">
-
-          <label>Line Height: <span id="line-height-value">72</span>px</label>
-          <input type="range" id="line-height" min="20" max="120" value="72">
-
-          <label>Between Sections: <span id="between-sections-value">60</span>px</label>
-          <input type="range" id="between-sections" min="10" max="150" value="60">
+          <label for="custom-tags">Hashtags:</label>
+          <input type="text" id="custom-tags" placeholder="Enter hashtags separated by commas..." />
+          
+          <label for="custom-username">Username:</label>
+          <input type="text" id="custom-username" placeholder="Enter your username..." />
+          
+          <label for="custom-watched-date">Watched Date (optional):</label>
+          <input type="date" id="custom-watched-date" />
+          
+          <button type="button" id="step3-generate" class="primary">Generate Poster</button>
         </div>
-      </details>
+      </div>
 
-      <div id="progress" class="progress" style="display:none"></div>
+      <div class="step" id="step-4" style="display: none;">
+        <details class="card details" id="settings-panel">
+          <summary>⚙️ Advanced Settings</summary>
 
-      <div id="result" class="result" style="display:none">
-        <img id="generated-image" alt="Generated Image" />
-        
-        <!-- New Menu Bar -->
-        <div class="menu-bar">
-          <div class="menu-section">
-            <h3>Main Poster:</h3>
-            <div class="poster-options" id="poster-options">
-              <!-- Poster options will be populated here -->
+          <div class="settings-tabs">
+            <button type="button" class="tab-button active" data-tab="metadata">Metadata</button>
+            <button type="button" class="tab-button" data-tab="visual">Visual</button>
+          </div>
+
+          <div class="tab-content active" id="metadata-tab">
+            <h2>🛠️ Customize Metadata Order</h2>
+            
+            <div id="classic-metadata-options">
+              <ul id="reorder-list">
+                <li data-id="title"><span class="drag-handle">☰</span><input type="checkbox" id="show-title" checked> Title</li>
+                <li data-id="year"><span class="drag-handle">☰</span><input type="checkbox" id="show-year" checked> Year</li>
+                <li data-id="director"><span class="drag-handle">☰</span><input type="checkbox" id="show-director" checked> Director</li>
+                <li data-id="music"><span class="drag-handle">☰</span><input type="checkbox" id="show-music"> Music</li>
+                <li data-id="actors"><span class="drag-handle">☰</span><input type="checkbox" id="show-actors" checked> Actors</li>
+                <li data-id="genre"><span class="drag-handle">☰</span><input type="checkbox" id="show-genre" checked> Genre</li>
+                <li data-id="runtime"><span class="drag-handle">☰</span><input type="checkbox" id="show-runtime"> Run Time</li>
+                <li data-id="rating"><span class="drag-handle">☰</span><input type="checkbox" id="show-rating" checked> Rating</li>
+                <li data-id="heart" class="non-reorderable"><span class="drag-handle disabled">❤️</span><input type="checkbox" id="show-heart"> Heart (if liked)</li>
+                <li data-id="tags"><span class="drag-handle">☰</span><input type="checkbox" id="show-tags" checked> Tags</li>
+                <li data-id="watched-date" class="non-reorderable"><span class="drag-handle disabled">📅</span><input type="checkbox" id="show-watched-date" checked> Watched Date</li>
+              </ul>
+            </div>
+            
+            <div id="experimental-metadata-options" style="display: none;">
+              <ul id="experimental-reorder-list">
+                <li data-id="logo"><span class="drag-handle disabled">🏷️</span><input type="checkbox" id="exp-show-logo" checked> Movie Logo</li>
+                <li data-id="credits"><span class="drag-handle disabled">🎬</span><input type="checkbox" id="exp-show-credits" checked> Credits</li>
+                <li data-id="rating"><span class="drag-handle disabled">⭐</span><input type="checkbox" id="exp-show-rating" checked> Rating Stars</li>
+                <li data-id="tags" class="non-reorderable"><span class="drag-handle disabled">#️⃣</span><input type="checkbox" id="exp-show-tags"> Hashtags</li>
+                <li data-id="watched-date" class="non-reorderable"><span class="drag-handle disabled">📅</span><input type="checkbox" id="exp-show-watched-date"> Watched Date</li>
+              </ul>
+              <p class="note">Note: In Experimental mode, elements appear in a fixed order with the logo at top.</p>
+            </div>
+          </div>
+
+          <div class="tab-content" id="visual-tab">
+            <h2>🎨 Visual Settings</h2>
+            <label><input type="checkbox" id="blur-backdrop" checked> Blur Backdrop</label>
+            <label><input type="checkbox" id="gradient-overlay" checked> Gradient Overlay (Bottom to Top)</label>
+
+            <label>Backdrop Brightness: <span id="backdrop-brightness-value">60</span>%</label>
+            <input type="range" id="backdrop-brightness" min="0" max="100" value="60">
+
+            <div class="poster-only-setting">
+              <label>Poster Scale: <span id="poster-scale-value">1.0</span>x</label>
+              <input type="range" id="poster-scale" min="0.5" max="2.0" step="0.1" value="1.0">
+              
+              <label>Poster Top Margin: <span id="poster-top-value">240</span>px</label>
+              <input type="range" id="poster-top" min="50" max="400" value="240">
+              
+              <label>Title Below Poster: <span id="title-below-poster-value">60</span>px</label>
+              <input type="range" id="title-below-poster" min="10" max="200" value="60">
+            </div>
+            
+            <div class="experimental-only-setting" style="display: none;">
+              <label>Logo Scale: <span id="logo-scale-value">1.0</span>x</label>
+              <input type="range" id="logo-scale" min="0.5" max="2.0" step="0.1" value="1.0">
+              
+              <label>Credits Font Size: <span id="credits-font-size-value">28</span>px</label>
+              <input type="range" id="credits-font-size" min="20" max="36" step="1" value="28">
+              
+              <label for="logo-alignment">Logo Alignment:</label>
+              <select id="logo-alignment">
+                <option value="left">Left-aligned</option>
+                <option value="center">Centered</option>
+              </select>
+            </div>
+            
+            <label>Footer Scale: <span id="footer-scale-value">1.0</span>x</label>
+            <input type="range" id="footer-scale" min="0.5" max="2.0" step="0.1" value="1.0">
+
+            <label>Line Height: <span id="line-height-value">72</span>px</label>
+            <input type="range" id="line-height" min="20" max="120" value="72">
+
+            <label>Between Sections: <span id="between-sections-value">60</span>px</label>
+            <input type="range" id="between-sections" min="10" max="150" value="60">
+          </div>
+        </details>
+
+        <div id="progress" class="progress" style="display:none"></div>
+
+        <div id="result" class="result" style="display:none">
+          <img id="generated-image" alt="Generated Image" />
+          
+          <div class="menu-bar">
+            <div class="menu-section">
+              <h3>Main Poster:</h3>
+              <div class="poster-options" id="poster-options">
+                <!-- Poster options will be populated here -->
+              </div>
+            </div>
+            
+            <div class="menu-section" id="logo-selection-section" style="display: none;">
+              <h3>Title Logo:</h3>
+              <div class="logo-options" id="logo-options">
+                <!-- Logo options will be populated here -->
+              </div>
+            </div>
+            
+            <div class="menu-section">
+              <h3>Background Photo:</h3>
+              <div class="background-options" id="background-options">
+                <!-- Background options will be populated here -->
+              </div>
             </div>
           </div>
           
-          <!-- Add new logo selection menu - only visible in Experimental mode when logos are available -->
-          <div class="menu-section" id="logo-selection-section" style="display: none;">
-            <h3>Title Logo:</h3>
-            <div class="logo-options" id="logo-options">
-              <!-- Logo options will be populated here -->
-            </div>
-          </div>
-          
-          <div class="menu-section">
-            <h3>Background Photo:</h3>
-            <div class="background-options" id="background-options">
-              <!-- Background options will be populated here -->
-            </div>
+          <div class="buttons">
+            <button id="copy-image">Copy Image</button>
+            <button id="download-image">Download Image</button>
           </div>
         </div>
-        
-        <div class="buttons">
-          <button id="copy-image">Copy Image</button>
-          <button id="download-image">Download Image</button>
-        </div>      </div>
+      </div>
     </form>
   </div>
 

@@ -69,6 +69,77 @@ document.addEventListener('DOMContentLoaded', () => {
     const seasonSelect = document.getElementById('season-select');
     const episodeSelect = document.getElementById('episode-select');
     const inputCard = document.getElementById('input-card');
+    const step1 = document.getElementById('step-1');
+    const step2 = document.getElementById('step-2');
+    const step3 = document.getElementById('step-3');
+    const step4 = document.getElementById('step-4');
+    const crumbs = document.querySelectorAll('.crumb');
+    const step1Search = document.getElementById('step1-search');
+    const step2Next = document.getElementById('step2-next');
+    const step2Generate = document.getElementById('step2-generate');
+    const step3Generate = document.getElementById('step3-generate');
+
+    let currentStep = 1;
+    let selectedMode = null;
+    let selectedLetterboxdUrl = null;
+    let hasGenerated = false;
+
+    function canNavigateToStep(step) {
+      if (step === 1) return true;
+      if (!selectedMode) return false;
+      if (step === 3 && selectedMode === 'letterboxd') return false;
+      if (step === 4 && !hasGenerated) return false;
+      return true;
+    }
+
+    function setStep(step) {
+      currentStep = step;
+      step1.style.display = step === 1 ? 'block' : 'none';
+      step2.style.display = step === 2 ? 'block' : 'none';
+      step3.style.display = step === 3 ? 'block' : 'none';
+      step4.style.display = step === 4 ? 'block' : 'none';
+
+      crumbs.forEach(crumb => {
+        const crumbStep = parseInt(crumb.dataset.step, 10);
+        crumb.classList.toggle('active', crumbStep === step);
+        crumb.classList.toggle('completed', crumbStep < step);
+        const enabled = canNavigateToStep(crumbStep);
+        crumb.classList.toggle('disabled', !enabled);
+        crumb.classList.toggle('clickable', enabled);
+      });
+    }
+
+    function updateStep2Actions() {
+      if (selectedMode === 'letterboxd') {
+        step2Next.style.display = 'none';
+        step2Generate.style.display = 'inline-flex';
+      } else {
+        step2Next.style.display = 'inline-flex';
+        step2Generate.style.display = 'none';
+      }
+    }
+
+    step2Next.addEventListener('click', () => {
+      setStep(3);
+    });
+
+    step2Generate.addEventListener('click', () => {
+      generatePoster();
+    });
+
+    step3Generate.addEventListener('click', () => {
+      generatePoster();
+    });
+
+    crumbs.forEach(crumb => {
+      crumb.addEventListener('click', () => {
+        const targetStep = parseInt(crumb.dataset.step, 10);
+        if (!canNavigateToStep(targetStep)) return;
+        setStep(targetStep);
+      });
+    });
+
+    setStep(1);
 
     if (window.innerWidth >= 560) {
       mediaInput.focus();
@@ -78,6 +149,11 @@ document.addEventListener('DOMContentLoaded', () => {
     function isLetterboxdShare(text) {
       // Letterboxd shares typically contain specific patterns
       return text.includes('letterboxd.com') || text.includes('Watched') || text.includes('★');
+    }
+
+    function extractLetterboxdUrl(text) {
+      const match = text.match(/(https:\/\/(?:boxd\.it|letterboxd\.com)\/[^\s]+)/);
+      return match ? match[1] : null;
     }
     
     // Function to perform search for movie/series
@@ -98,17 +174,57 @@ document.addEventListener('DOMContentLoaded', () => {
         searchResults.innerHTML = '<div style="padding: 1rem; text-align: center; color: #ff3b30;">Search failed. Please try again.</div>';
       }
     };
+
+    const performLetterboxdPreview = async (letterboxdUrl) => {
+      searchResults.innerHTML = '<div style="padding: 1rem; text-align: center;">Fetching Letterboxd...</div>';
+      searchResults.style.display = 'block';
+
+      try {
+        const response = await fetch('/letterboxd-preview', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ letterboxdUrl })
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to fetch Letterboxd data');
+        }
+
+        displaySearchResults([{
+          ...data,
+          media_type: 'letterboxd',
+          letterboxdUrl: letterboxdUrl
+        }]);
+      } catch (error) {
+        searchResults.innerHTML = '<div style="padding: 1rem; text-align: center; color: #ff3b30;">Letterboxd fetch failed. Please try again.</div>';
+      }
+    };
+
+    function handleSearch() {
+      const text = mediaInput.value.trim();
+      if (!text) return;
+      const letterboxdUrl = extractLetterboxdUrl(text);
+      if (letterboxdUrl) {
+        performLetterboxdPreview(letterboxdUrl);
+      } else {
+        performSearch(text);
+      }
+    }
     
     // Add Enter key support to media input
     mediaInput.addEventListener('keypress', (e) => {
       if (e.key === 'Enter') {
         e.preventDefault();
-        const text = mediaInput.value.trim();
-        if (!isLetterboxdShare(text)) {
-          performSearch(text);
-        }
+        handleSearch();
       }
-    });    function displaySearchResults(results) {
+    });
+
+    step1Search.addEventListener('click', () => {
+      handleSearch();
+    });
+
+    function displaySearchResults(results) {
       if (!results || results.length === 0) {
         searchResults.innerHTML = '<div style="padding: 1rem; text-align: center;">No results found</div>';
         return;
@@ -116,9 +232,10 @@ document.addEventListener('DOMContentLoaded', () => {
       
       searchResults.innerHTML = results.map(item => {        const title = item.title || item.name;
         const year = (item.release_date || item.first_air_date) ? `(${(item.release_date || item.first_air_date).substring(0, 4)})` : '';
-        const mediaType = item.media_type === 'tv' ? 'TV Series' : 'Movie';
-        const mediaTypeClass = item.media_type === 'tv' ? 'tv-series' : '';
-        const rating = item.vote_average ? item.vote_average.toFixed(1) : 'N/A';
+        const isLetterboxd = item.media_type === 'letterboxd';
+        const mediaType = isLetterboxd ? 'Letterboxd' : (item.media_type === 'tv' ? 'TV Series' : 'Movie');
+        const mediaTypeClass = isLetterboxd ? 'letterboxd' : (item.media_type === 'tv' ? 'tv-series' : '');
+        const rating = item.vote_average ? item.vote_average.toFixed(1) : (isLetterboxd ? '—' : 'N/A');
         const voteCount = item.vote_count || 0;
         const overview = item.overview ? item.overview.substring(0, 120) + '...' : 'No description available';          // Director/Creator and Cast info
         const directorLabel = item.media_type === 'tv' ? 'Created by' : 'Directed by';
@@ -158,10 +275,12 @@ document.addEventListener('DOMContentLoaded', () => {
           }
         }
         
+        const posterUrl = item.poster_url || (item.poster_path ? `https://image.tmdb.org/t/p/w92${item.poster_path}` : '');
+
         return `
-          <div class="search-result-item" data-id="${item.id}" data-type="${item.media_type || 'movie'}">
-            ${item.poster_path 
-              ? `<img class="search-result-poster" src="https://image.tmdb.org/t/p/w92${item.poster_path}" alt="${title}">`
+          <div class="search-result-item" data-id="${item.id || ''}" data-type="${item.media_type || 'movie'}" data-letterboxd-url="${item.letterboxdUrl || ''}">
+            ${posterUrl
+              ? `<img class="search-result-poster" src="${posterUrl}" alt="${title}">`
               : '<div class="search-result-poster">No Image</div>'
             }
             <div class="search-result-info">              <div class="search-result-header">
@@ -171,8 +290,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 <span class="search-result-type ${mediaTypeClass}">${mediaType}</span>
               </div>
               <div class="search-result-rating">
-                <span class="search-result-score">${rating}/10</span>
-                <span class="search-result-votes">(${voteCount.toLocaleString()} votes)</span>
+                <span class="search-result-score">${rating}${isLetterboxd ? '' : '/10'}</span>
+                ${isLetterboxd ? '<span class="search-result-votes">From Letterboxd link</span>' : `<span class="search-result-votes">(${voteCount.toLocaleString()} votes)</span>`}
               </div>
               ${infoTags}
               ${directorInfo}
@@ -187,23 +306,32 @@ document.addEventListener('DOMContentLoaded', () => {
         item.addEventListener('click', () => {
           const selectedId = item.dataset.id;
           const selectedType = item.dataset.type;
+          const letterboxdUrl = item.dataset.letterboxdUrl;
           
           // Find the selected item data
           const selectedItem = results.find(r => r.id == selectedId && r.media_type == selectedType);
           
-          // Store selected media data
-          window.selectedMedia = {
-            id: selectedId,
-            type: selectedType,
-            data: selectedItem
-          };
-          
-          // Show selected media display
-          displaySelectedMedia(selectedItem);
-          
-          // Hide search results and show custom fields
+          if (selectedType === 'letterboxd') {
+            selectedMode = 'letterboxd';
+            selectedLetterboxdUrl = letterboxdUrl;
+            window.selectedMedia = null;
+            hasGenerated = false;
+            displaySelectedMedia(selectedItem);
+          } else {
+            selectedMode = 'custom';
+            selectedLetterboxdUrl = null;
+            window.selectedMedia = {
+              id: selectedId,
+              type: selectedType,
+              data: selectedItem
+            };
+            hasGenerated = false;
+            displaySelectedMedia(selectedItem);
+          }
+
           searchResults.style.display = 'none';
-          customFields.style.display = 'block';
+          updateStep2Actions();
+          setStep(2);
         });
       });
     }
@@ -216,7 +344,10 @@ document.addEventListener('DOMContentLoaded', () => {
       const selectedMeta = document.getElementById('selected-meta');
       
       // Set poster
-      if (item.poster_path) {
+      if (item.poster_url) {
+        selectedPoster.src = item.poster_url;
+        selectedPoster.style.display = 'block';
+      } else if (item.poster_path) {
         selectedPoster.src = `https://image.tmdb.org/t/p/w92${item.poster_path}`;
         selectedPoster.style.display = 'block';
       } else {
@@ -226,7 +357,7 @@ document.addEventListener('DOMContentLoaded', () => {
       // Set title and year
       const title = item.title || item.name;
       const year = (item.release_date || item.first_air_date) ? `(${(item.release_date || item.first_air_date).substring(0, 4)})` : '';
-      const mediaType = item.media_type === 'tv' ? 'TV Series' : 'Movie';
+      const mediaType = item.media_type === 'letterboxd' ? 'Letterboxd' : (item.media_type === 'tv' ? 'TV Series' : 'Movie');
       
       selectedTitle.textContent = `${title} ${year}`;
       selectedMeta.textContent = mediaType;
@@ -245,8 +376,12 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('change-selection').addEventListener('click', () => {
       document.getElementById('selected-media').style.display = 'none';
       document.getElementById('search-results').style.display = 'block';
-      document.getElementById('custom-fields').style.display = 'none';
       resetTvSelector();
+      selectedMode = null;
+      selectedLetterboxdUrl = null;
+      hasGenerated = false;
+      updateStep2Actions();
+      setStep(1);
       mediaInput.focus();
     });
 
@@ -795,41 +930,37 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
 
-    document.getElementById('image-form').addEventListener('submit', async (e) => {
-      e.preventDefault();
+    const imageForm = document.getElementById('image-form');
+    imageForm.addEventListener('submit', (e) => e.preventDefault());
+
+    async function generatePoster() {
       overlay.classList.add('show');
       result.style.display = 'none';
 
-      const userInput = mediaInput.value.trim();
       let requestData;
       
-      if (isLetterboxdShare(userInput)) {
-        // Extract URL from the share text
-        const urlMatch = userInput.match(/(https:\/\/(?:boxd\.it|letterboxd\.com)\/[^\s]+)/);
-        if (!urlMatch) {
-          alert('Please provide a valid Letterboxd URL.');
+      if (selectedMode === 'letterboxd') {
+        if (!selectedLetterboxdUrl) {
+          alert('Please select a Letterboxd result first.');
           overlay.classList.remove('show');
           return;
         }
-        const letterboxdUrl = urlMatch[1];
-        
+
         requestData = {
           mode: 'letterboxd',
-          letterboxdUrl: letterboxdUrl
+          letterboxdUrl: selectedLetterboxdUrl
         };
       } else {
-        // Custom mode - must have selected media
         if (!window.selectedMedia) {
           alert('Please search and select a movie or TV series first.');
           overlay.classList.remove('show');
           return;
         }
-        
+
         const customRating = parseFloat(document.getElementById('custom-rating').value) / 2; // Convert to 5-star scale
         const customTags = document.getElementById('custom-tags').value.split(',').map(tag => tag.trim()).filter(tag => tag);
         const customUsername = document.getElementById('custom-username').value.trim() || 'Anonymous';
-        
-        // Format watched date if provided
+
         let watchedDate = null;
         const dateInput = document.getElementById('custom-watched-date').value;
         if (dateInput) {
@@ -837,7 +968,7 @@ document.addEventListener('DOMContentLoaded', () => {
           const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
           watchedDate = `${date.getDate()} ${months[date.getMonth()]} ${date.getFullYear()}`;
         }
-        
+
         requestData = {
           mode: 'custom',
           mediaId: window.selectedMedia.id,
@@ -856,7 +987,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       }
 
-      // Gather settings based on poster style
       const isExperimental = currentPosterStyle === 'experimental';
       let contentOrder, metadataSettings;
       
@@ -935,6 +1065,8 @@ document.addEventListener('DOMContentLoaded', () => {
         generatedImage.src = url;
         result.style.display = 'block';
         overlay.classList.remove('show');
+        hasGenerated = true;
+        setStep(4);
         
         // Auto-scroll to result
         result.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -956,5 +1088,5 @@ document.addEventListener('DOMContentLoaded', () => {
         alert('Error: ' + err.message);
         overlay.classList.remove('show');
       }
-    });
+    }
   });

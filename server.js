@@ -145,6 +145,50 @@ app.post('/search-media', async (req, res) => {
   }
 });
 
+// Letterboxd preview endpoint
+app.post('/letterboxd-preview', async (req, res) => {
+  const { letterboxdUrl } = req.body;
+
+  if (!letterboxdUrl) {
+    return res.status(400).json({ error: 'letterboxdUrl is required' });
+  }
+
+  try {
+    const response = await fetch(letterboxdUrl);
+    const html = await response.text();
+    const $ = cheerio.load(html);
+
+    let title = $('.inline-production-masthead .name a').first().text().trim();
+    let year = $('.inline-production-masthead .releasedate a').first().text().trim();
+
+    if (!title) {
+      title = $('.film-title-wrapper a').first().text().trim();
+      year = $('.film-title-wrapper .metadata a').first().text().trim();
+    }
+
+    const directorText = $('a[href*="/director/"]').first().text().trim();
+
+    const { movie, details, credits } = await fetchTmdbData(title, year, directorText);
+    const director = credits.crew?.find(c => c.job === 'Director')?.name || '';
+
+    res.json({
+      id: movie?.id,
+      title: movie?.title || title,
+      name: movie?.title || title,
+      release_date: movie?.release_date || (year ? `${year}-01-01` : ''),
+      overview: movie?.overview || '',
+      vote_average: movie?.vote_average || 0,
+      vote_count: movie?.vote_count || 0,
+      director,
+      poster_path: movie?.poster_path || null,
+      poster_url: movie?.poster_path ? `https://image.tmdb.org/t/p/w92${movie.poster_path}` : ''
+    });
+  } catch (error) {
+    console.error('❌ Letterboxd preview error:', error.message);
+    res.status(500).json({ error: 'Failed to fetch Letterboxd preview' });
+  }
+});
+
 // TV seasons endpoint
 app.get('/tv-seasons', async (req, res) => {
   const { mediaId } = req.query;
