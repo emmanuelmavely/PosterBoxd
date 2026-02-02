@@ -159,7 +159,7 @@ Create a `.env` file in the project root:
 
 ```env
 TMDB_API_KEY=your_tmdb_api_key_here
-PORT=3000
+PORT=3000  # Optional, defaults to 3000
 ```
 
 To get a TMDb API key:
