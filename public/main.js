@@ -1,23 +1,4 @@
 document.addEventListener('DOMContentLoaded', () => {
-    // Mode switching
-    const modePills = document.querySelectorAll('.mode-pill');
-    const letterboxdMode = document.getElementById('letterboxd-mode');
-    const customMode = document.getElementById('custom-mode');
-    
-    modePills.forEach(pill => {
-      pill.addEventListener('click', () => {
-        modePills.forEach(p => p.classList.remove('active'));
-        pill.classList.add('active');
-        
-        if (pill.dataset.mode === 'letterboxd') {
-          letterboxdMode.style.display = 'block';
-          customMode.style.display = 'none';
-        } else {
-          letterboxdMode.style.display = 'none';
-          customMode.style.display = 'block';
-        }
-      });
-    });
 
     // Tab switching
     const tabButtons = document.querySelectorAll('.tab-button');
@@ -78,17 +59,29 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Initialize
-    updateStarsDisplay(ratingSlider.value);    // Search functionality
-    const searchButton = document.getElementById('search-button');
-    const customTitle = document.getElementById('custom-title');
+    updateStarsDisplay(ratingSlider.value);
+
+    // Unified input functionality
+    const mediaInput = document.getElementById('media-input');
     const searchResults = document.getElementById('search-results');
     const customFields = document.getElementById('custom-fields');
+    const tvSelector = document.getElementById('tv-episode-selector');
+    const seasonSelect = document.getElementById('season-select');
+    const episodeSelect = document.getElementById('episode-select');
+    const inputCard = document.getElementById('input-card');
+
+    if (window.innerWidth >= 560) {
+      mediaInput.focus();
+    }
     
-    // Function to perform search
-    const performSearch = async () => {
-      const query = customTitle.value.trim();
-      if (!query) return;
-      
+    // Detect if input is Letterboxd format or movie name
+    function isLetterboxdShare(text) {
+      // Letterboxd shares typically contain specific patterns
+      return text.includes('letterboxd.com') || text.includes('Watched') || text.includes('★');
+    }
+    
+    // Function to perform search for movie/series
+    const performSearch = async (query) => {
       searchResults.innerHTML = '<div style="padding: 1rem; text-align: center;">Searching...</div>';
       searchResults.style.display = 'block';
       
@@ -106,14 +99,14 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     };
     
-    // Add click event to search button
-    searchButton.addEventListener('click', performSearch);
-    
-    // Add Enter key support to search input
-    customTitle.addEventListener('keypress', (e) => {
+    // Add Enter key support to media input
+    mediaInput.addEventListener('keypress', (e) => {
       if (e.key === 'Enter') {
         e.preventDefault();
-        performSearch();
+        const text = mediaInput.value.trim();
+        if (!isLetterboxdShare(text)) {
+          performSearch(text);
+        }
       }
     });    function displaySearchResults(results) {
       if (!results || results.length === 0) {
@@ -237,6 +230,12 @@ document.addEventListener('DOMContentLoaded', () => {
       
       selectedTitle.textContent = `${title} ${year}`;
       selectedMeta.textContent = mediaType;
+
+      if (item.media_type === 'tv') {
+        loadTvSeasons(item.id);
+      } else {
+        resetTvSelector();
+      }
       
       // Show the selected media display
       selectedMediaDiv.style.display = 'block';
@@ -247,6 +246,68 @@ document.addEventListener('DOMContentLoaded', () => {
       document.getElementById('selected-media').style.display = 'none';
       document.getElementById('search-results').style.display = 'block';
       document.getElementById('custom-fields').style.display = 'none';
+      resetTvSelector();
+      mediaInput.focus();
+    });
+
+    function resetTvSelector() {
+      tvSelector.style.display = 'none';
+      seasonSelect.innerHTML = '<option value="">All seasons</option>';
+      episodeSelect.innerHTML = '<option value="">All episodes</option>';
+      episodeSelect.disabled = true;
+    }
+
+    async function loadTvSeasons(mediaId) {
+      resetTvSelector();
+      tvSelector.style.display = 'block';
+      try {
+        const res = await fetch(`/tv-seasons?mediaId=${mediaId}`);
+        if (!res.ok) throw new Error('Failed to load seasons');
+        const data = await res.json();
+        const seasons = data.seasons || [];
+        seasons.forEach(season => {
+          const option = document.createElement('option');
+          option.value = season.season_number;
+          option.textContent = `Season ${season.season_number}${season.name ? ` — ${season.name}` : ''}`;
+          seasonSelect.appendChild(option);
+        });
+      } catch (err) {
+        console.error('Error loading seasons:', err);
+        resetTvSelector();
+      }
+    }
+
+    async function loadTvEpisodes(mediaId, seasonNumber) {
+      episodeSelect.innerHTML = '<option value="">All episodes</option>';
+      episodeSelect.disabled = true;
+      if (!seasonNumber) return;
+
+      try {
+        const res = await fetch(`/tv-episodes?mediaId=${mediaId}&seasonNumber=${seasonNumber}`);
+        if (!res.ok) throw new Error('Failed to load episodes');
+        const data = await res.json();
+        const episodes = data.episodes || [];
+        episodes.forEach(episode => {
+          const option = document.createElement('option');
+          option.value = episode.episode_number;
+          option.textContent = `Episode ${episode.episode_number}${episode.name ? ` — ${episode.name}` : ''}`;
+          episodeSelect.appendChild(option);
+        });
+        episodeSelect.disabled = false;
+      } catch (err) {
+        console.error('Error loading episodes:', err);
+      }
+    }
+
+    seasonSelect.addEventListener('change', () => {
+      const seasonNumber = seasonSelect.value;
+      if (!window.selectedMedia || !window.selectedMedia.id) return;
+      if (!seasonNumber) {
+        episodeSelect.innerHTML = '<option value="">All episodes</option>';
+        episodeSelect.disabled = true;
+        return;
+      }
+      loadTvEpisodes(window.selectedMedia.id, seasonNumber);
     });
 
     // Live update slider labels
@@ -292,7 +353,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!currentSessionId) return;
 
       // Update current settings with new values
-      const isExperimental = posterStyleSelect.value === 'experimental';
+      const isExperimental = currentPosterStyle === 'experimental';
       let contentOrder, metadataSettings;
       
       if (isExperimental) {
@@ -335,7 +396,7 @@ document.addEventListener('DOMContentLoaded', () => {
           lineHeight: parseInt(document.getElementById('line-height').value),
           betweenSections: parseInt(document.getElementById('between-sections').value),
         },
-        posterStyle: posterStyleSelect.value,
+        posterStyle: currentPosterStyle,
         experimentalSettings: {
           creditsFontSize: document.getElementById('credits-font-size')?.value || 28,
           logoAlignment: document.getElementById('logo-alignment')?.value || 'left',
@@ -375,14 +436,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Function to reset selection indices for experimental mode
     function resetSelectionForExperimental() {
-      if (posterStyleSelect.value === 'experimental') {
+      if (currentPosterStyle === 'experimental') {
         selectedPosterIndex = -1; // No poster selected by default
         selectedBackgroundIndex = 0; // First background selected by default
       }
     }
 
-    // Poster Style dropdown
-    const posterStyleSelect = document.getElementById('poster-style-select');
+    // Poster Style buttons
+    const posterStyleButtons = document.querySelectorAll('.style-option');
+    let currentPosterStyle = 'classic';
+    const activeStyleButton = document.querySelector('.style-option.active');
+    if (activeStyleButton) {
+      currentPosterStyle = activeStyleButton.dataset.style;
+    }
     const blurBackdropCheckbox = document.getElementById('blur-backdrop');
     const posterOptionsSection = document.querySelector('.menu-section h3'); // "Main Poster:"
     const posterOptionsDiv = document.getElementById('poster-options');
@@ -392,45 +458,36 @@ document.addEventListener('DOMContentLoaded', () => {
     // Elements that need to be toggled based on poster style
     const posterRelatedSettings = document.querySelectorAll('.poster-only-setting');
     const experimentalRelatedSettings = document.querySelectorAll('.experimental-only-setting');
-    
-    // When poster style changes, update settings panel and defaults
-    posterStyleSelect.addEventListener('change', () => {
-      const isExperimental = posterStyleSelect.value === 'experimental';
-      
-      // Update defaults for experimental mode
+
+    function applyPosterStyle(shouldRegenerate = true) {
+      const isExperimental = currentPosterStyle === 'experimental';
+
       if (isExperimental) {
         blurBackdropCheckbox.checked = false;
-        // Set backdrop brightness to 100% for experimental mode
         const backdropBrightnessSlider = document.getElementById('backdrop-brightness');
         const backdropBrightnessValue = document.getElementById('backdrop-brightness-value');
         backdropBrightnessSlider.value = 100;
         backdropBrightnessValue.textContent = 100;
-        
-        // Show experimental-only settings, hide poster-only settings
+
         posterRelatedSettings.forEach(el => el.style.display = 'none');
         experimentalRelatedSettings.forEach(el => el.style.display = '');
-        
-        // Show experimental metadata options, hide classic ones
+
         document.getElementById('classic-metadata-options').style.display = 'none';
         document.getElementById('experimental-metadata-options').style.display = 'block';
       } else {
-        // Classic mode - restore default settings visibility and reset backdrop brightness
         const backdropBrightnessSlider = document.getElementById('backdrop-brightness');
         const backdropBrightnessValue = document.getElementById('backdrop-brightness-value');
         backdropBrightnessSlider.value = 60;
         backdropBrightnessValue.textContent = 60;
-        
+
         posterRelatedSettings.forEach(el => el.style.display = '');
         experimentalRelatedSettings.forEach(el => el.style.display = 'none');
-        
-        // Show classic metadata options, hide experimental ones
+
         document.getElementById('classic-metadata-options').style.display = 'block';
         document.getElementById('experimental-metadata-options').style.display = 'none';
       }
 
-      // Only regenerate if we have an active session and the style actually changed
-      if (currentSessionId && currentSettings) {
-        // Reset selections for experimental mode
+      if (currentSessionId && currentSettings && shouldRegenerate) {
         if (isExperimental) {
           selectedPosterIndex = -1;
           selectedBackgroundIndex = 0;
@@ -440,7 +497,25 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         regenerateWithCurrentSettings();
       }
-    });    // Function to create option items
+    }
+
+    posterStyleButtons.forEach(button => {
+      button.addEventListener('click', () => {
+        const style = button.dataset.style;
+        if (style === currentPosterStyle) return;
+        currentPosterStyle = style;
+        posterStyleButtons.forEach(btn => {
+          const isActive = btn.dataset.style === currentPosterStyle;
+          btn.classList.toggle('active', isActive);
+          btn.setAttribute('aria-pressed', String(isActive));
+        });
+        applyPosterStyle(true);
+      });
+    });
+
+    applyPosterStyle(false);
+    
+    // Function to create option items
     function createOptionItem(src, type, index, isActive = false) {
       const item = document.createElement('div');
       item.className = `option-item ${isActive ? 'active' : ''}`;
@@ -463,11 +538,11 @@ document.addEventListener('DOMContentLoaded', () => {
       
       item.addEventListener('click', () => {
         // In experimental mode, handle poster/background selection logic
-        if (posterStyleSelect.value === 'experimental' && type === 'poster') {
+        if (currentPosterStyle === 'experimental' && type === 'poster') {
           // Reset background selection when poster is selected
           selectedBackgroundIndex = -1;
           selectedPosterIndex = index;
-        } else if (posterStyleSelect.value === 'experimental' && type === 'background') {
+        } else if (currentPosterStyle === 'experimental' && type === 'background') {
           // Reset poster selection when background is selected
           selectedPosterIndex = -1;
           selectedBackgroundIndex = index;
@@ -486,13 +561,6 @@ document.addEventListener('DOMContentLoaded', () => {
       return item;
     }
 
-    // When poster style changes, default blur off for Experimental
-    posterStyleSelect.addEventListener('change', () => {
-      if (posterStyleSelect.value === 'experimental') {
-        blurBackdropCheckbox.checked = false;
-      }
-    });
-
     // Function to populate menu options
     function populateMenuOptions(movieData) {
       // Clear existing options
@@ -504,7 +572,7 @@ document.addEventListener('DOMContentLoaded', () => {
       logoSelectionSection.style.display = 'none';
 
       // Experimental mode: handle logos and other options
-      if (posterStyleSelect.value === 'experimental') {
+      if (currentPosterStyle === 'experimental') {
         // Show poster section for experimental mode (posters will be used as backgrounds)
         posterOptionsSection.parentElement.style.display = '';
 
@@ -603,7 +671,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Update active states for all option types - but handle experimental mode specially
         document.querySelectorAll('.option-item').forEach(item => item.classList.remove('active'));
           // In experimental mode, only show active state for the option that's actually being used
-        if (posterStyleSelect.value === 'experimental') {
+        if (currentPosterStyle === 'experimental') {
           // In experimental, poster selection takes priority for background
           if (selectedPosterIndex >= 0) {
             document.querySelectorAll(`[data-type="poster"][data-index="${selectedPosterIndex}"]`).forEach(item => item.classList.add('active'));
@@ -732,15 +800,12 @@ document.addEventListener('DOMContentLoaded', () => {
       overlay.classList.add('show');
       result.style.display = 'none';
 
-      // Check which mode is active
-      const activeMode = document.querySelector('.mode-pill.active').dataset.mode;
-      
+      const userInput = mediaInput.value.trim();
       let requestData;
       
-      if (activeMode === 'letterboxd') {
+      if (isLetterboxdShare(userInput)) {
         // Extract URL from the share text
-        const shareText = document.getElementById('letterboxd-url').value.trim();
-        const urlMatch = shareText.match(/(https:\/\/(?:boxd\.it|letterboxd\.com)\/[^\s]+)/);
+        const urlMatch = userInput.match(/(https:\/\/(?:boxd\.it|letterboxd\.com)\/[^\s]+)/);
         if (!urlMatch) {
           alert('Please provide a valid Letterboxd URL.');
           overlay.classList.remove('show');
@@ -753,7 +818,7 @@ document.addEventListener('DOMContentLoaded', () => {
           letterboxdUrl: letterboxdUrl
         };
       } else {
-        // Custom mode
+        // Custom mode - must have selected media
         if (!window.selectedMedia) {
           alert('Please search and select a movie or TV series first.');
           overlay.classList.remove('show');
@@ -782,10 +847,17 @@ document.addEventListener('DOMContentLoaded', () => {
           username: customUsername,
           watchedDate: watchedDate
         };
+
+        if (window.selectedMedia.type === 'tv') {
+          const seasonNumber = seasonSelect.value ? parseInt(seasonSelect.value, 10) : null;
+          const episodeNumber = episodeSelect.value ? parseInt(episodeSelect.value, 10) : null;
+          requestData.seasonNumber = seasonNumber;
+          requestData.episodeNumber = seasonNumber ? episodeNumber : null;
+        }
       }
 
       // Gather settings based on poster style
-      const isExperimental = posterStyleSelect.value === 'experimental';
+      const isExperimental = currentPosterStyle === 'experimental';
       let contentOrder, metadataSettings;
       
       if (isExperimental) {
@@ -830,7 +902,7 @@ document.addEventListener('DOMContentLoaded', () => {
           lineHeight: parseInt(document.getElementById('line-height').value),
           betweenSections: parseInt(document.getElementById('between-sections').value),
         },
-        posterStyle: posterStyleSelect.value,
+        posterStyle: currentPosterStyle,
         experimentalSettings: {
           creditsFontSize: document.getElementById('credits-font-size')?.value || 28,
           logoAlignment: document.getElementById('logo-alignment')?.value || 'left',
@@ -863,7 +935,11 @@ document.addEventListener('DOMContentLoaded', () => {
         generatedImage.src = url;
         result.style.display = 'block';
         overlay.classList.remove('show');
-          // Store session ID and populate menu
+        
+        // Auto-scroll to result
+        result.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        
+        // Store session ID and populate menu
         currentSessionId = responseData.sessionId;
         
         // Reset selection for experimental mode

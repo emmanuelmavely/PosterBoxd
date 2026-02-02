@@ -24,10 +24,6 @@
 </head>
 <body>
   <div id="loading-overlay">
-  <i class="fa-brands fa-letterboxd fa-beat-fade"></i>
-  <p>Generating poster...</p>
-</div>
-<div id="loading-overlay">
     <i class="fa-brands fa-letterboxd fa-beat-fade"></i>
     <p>Generating poster...</p>
   </div>
@@ -38,73 +34,115 @@
     </div>
 
     <form id="image-form">
-      <!-- Mode Selection Pills -->
-      <div class="mode-selector">
-        <button type="button" class="mode-pill active" data-mode="letterboxd">
-          <i class="fa-brands fa-letterboxd"></i> Letterboxd
-        </button>
-        <button type="button" class="mode-pill" data-mode="custom">
-          <i class="fas fa-film"></i> Custom
-        </button>
+      <!-- Unified Input Card -->
+      <div class="card" id="input-card">
+        <label for="media-input" class="input-label">Get started</label>
+        <div class="input-row">
+          <input type="text" id="media-input" placeholder="Paste Letterboxd share text or type a movie/series name..." />
+          <button type="submit" id="get-started-btn">Generate</button>
+        </div>
+        <p class="input-help">Tip: Press Enter to search titles. Paste a Letterboxd share to generate instantly.</p>
       </div>
 
-      <!-- Poster Style Dropdown in Card -->
-      <div class="card" style="margin-bottom: 0;">
-        <div class="poster-style-row">
-          <label for="poster-style-select">Poster Style:</label>
-          <select id="poster-style-select">
-            <option value="classic">Classic</option>
-            <option value="experimental">Experimental</option>
-          </select>
+      <!-- Search Results (shown after typing a movie name) -->
+      <div id="search-results" class="search-results" style="display: none;"></div>
+      
+      <!-- Selected media display -->
+      <div id="selected-media" class="selected-media" style="display: none;">
+        <div class="selected-media-content">
+          <img id="selected-poster" class="selected-poster" alt="Selected media poster">
+          <div class="selected-info">
+            <div class="selected-title" id="selected-title"></div>
+            <div class="selected-meta" id="selected-meta"></div>
+          </div>
+          <button type="button" class="change-selection-btn" id="change-selection">Change</button>
         </div>
       </div>
 
-      <!-- Letterboxd Mode -->
-      <div class="card" id="letterboxd-mode">
-        <label for="letterboxd-url">Letterboxd Share Text:</label>
-        <input type="text" id="letterboxd-url" placeholder="Paste the share text here..." />
+      <!-- Custom fields (shown after media selection) -->
+      <div id="custom-fields" class="card" style="display: none;">
+        <div style="margin-top: 0;"></div>
+        <label for="custom-rating" style="padding-bottom: 0.5rem; align-items: flex-start;">Rating:</label>
+        <div class="rating-container">
+          <input type="range" id="custom-rating" class="rating-slider" min="0" max="10" step="0.5" value="0">
+          <div class="rating-stars">
+            <span class="stars-display">☆☆☆☆☆</span>
+          </div>
+        </div>
+
+        <!-- TV Season/Episode Selector (shown only for TV series) -->
+        <div id="tv-episode-selector" class="tv-selector" style="display: none;">
+          <label for="season-select">Season:</label>
+          <select id="season-select">
+            <option value="">All seasons</option>
+          </select>
+
+          <label for="episode-select">Episode:</label>
+          <select id="episode-select" disabled>
+            <option value="">All episodes</option>
+          </select>
+          <p class="input-help">Choose a season for a season-only poster, or pick an episode for a specific episode.</p>
+        </div>
+        
+        <label for="custom-tags">Hashtags:</label>
+        <input type="text" id="custom-tags" placeholder="Enter hashtags separated by commas..." />
+        
+        <label for="custom-username">Username:</label>
+        <input type="text" id="custom-username" placeholder="Enter your username..." />
+        
+        <label for="custom-watched-date">Watched Date (optional):</label>
+        <input type="date" id="custom-watched-date" />
+        
         <button type="submit">Generate Image</button>
       </div>
 
-      <!-- Custom Mode -->
-      <div class="card" id="custom-mode" style="display: none;">
-        <label for="custom-title">Title:</label>
-        <input type="text" id="custom-title" placeholder="Enter movie or TV series title..." />
-        <button type="button" id="search-button">Search</button>
-          <div id="search-results" class="search-results" style="display: none;"></div>
-        
-        <!-- Selected media display -->
-        <div id="selected-media" class="selected-media" style="display: none;">
-          <div class="selected-media-content">
-            <img id="selected-poster" class="selected-poster" alt="Selected media poster">
-            <div class="selected-info">
-              <div class="selected-title" id="selected-title"></div>
-              <div class="selected-meta" id="selected-meta"></div>
-            </div>
-            <button type="button" class="change-selection-btn" id="change-selection">Change</button>
+      <!-- Poster Style Selector -->
+      <div class="card" style="margin-bottom: 0;">
+        <div class="poster-style-row">
+          <label id="poster-style-label">Poster Style</label>
+          <div class="poster-style-grid" role="group" aria-labelledby="poster-style-label">
+            <button type="button" class="style-option active" data-style="classic" aria-pressed="true">
+              <span class="style-preview">
+                <svg width="300" height="533" viewBox="0 0 300 533" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <rect width="300" height="533" fill="#F3F4F6"/>
+                  <rect x="75" y="80" width="150" height="220" rx="8" fill="#D1D5DB"/>
+                  <rect x="80" y="320" width="140" height="16" rx="4" fill="#9CA3AF"/>
+                  <rect x="120" y="345" width="60" height="10" rx="2" fill="#D1D5DB"/>
+                  <rect x="60" y="370" width="180" height="10" rx="2" fill="#D1D5DB"/>
+                  <rect x="40" y="390" width="220" height="10" rx="2" fill="#D1D5DB"/>
+                  <rect x="90" y="415" width="120" height="8" rx="2" fill="#E5E7EB"/>
+                  <g transform="translate(110, 440)">
+                    <circle cx="0" cy="0" r="6" fill="#D1D5DB"/>
+                    <circle cx="20" cy="0" r="6" fill="#D1D5DB"/>
+                    <circle cx="40" cy="0" r="6" fill="#D1D5DB"/>
+                    <circle cx="60" cy="0" r="6" fill="#D1D5DB"/>
+                    <circle cx="80" cy="0" r="6" fill="#D1D5DB"/>
+                  </g>
+                </svg>
+              </span>
+              <span class="style-label">Classic</span>
+            </button>
+            <button type="button" class="style-option" data-style="experimental" aria-pressed="false">
+              <span class="style-preview">
+                  <svg width="300" height="533" viewBox="0 0 300 533" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <rect width="300" height="533" fill="#F3F4F6"/>
+                  <rect x="20" y="280" width="120" height="40" rx="4" fill="#D1D5DB"/>
+                  <rect x="20" y="340" width="160" height="10" rx="2" fill="#D1D5DB"/>
+                  <rect x="20" y="360" width="220" height="10" rx="2" fill="#D1D5DB"/>
+                  <rect x="20" y="380" width="240" height="10" rx="2" fill="#D1D5DB"/>
+                  <rect x="20" y="400" width="180" height="10" rx="2" fill="#D1D5DB"/>
+                  <rect x="20" y="420" width="200" height="10" rx="2" fill="#D1D5DB"/>
+                  <circle cx="25" cy="450" r="8" fill="#D1D5DB"/>
+                  <circle cx="45" cy="450" r="8" fill="#D1D5DB"/>
+                  <circle cx="65" cy="450" r="8" fill="#D1D5DB"/>
+                  <circle cx="85" cy="450" r="8" fill="#D1D5DB"/>
+                  <circle cx="105" cy="450" r="8" fill="#D1D5DB"/>
+                  <rect x="110" y="500" width="80" height="8" rx="2" fill="#E5E7EB"/>
+                </svg>
+              </span>
+              <span class="style-label">Experimental</span>
+            </button>
           </div>
-        </div>
-        
-        <div id="custom-fields" style="display: none;">
-          <div style="margin-top: 1.5rem;"></div>
-          <label for="custom-rating" style="padding-bottom: 0.5rem; align-items: flex-start;">Rating:</label>
-          <div class="rating-container">
-            <input type="range" id="custom-rating" class="rating-slider" min="0" max="10" step="0.5" value="0">
-            <div class="rating-stars">
-              <span class="stars-display">☆☆☆☆☆</span>
-            </div>
-          </div>
-          
-          <label for="custom-tags">Hashtags:</label>
-          <input type="text" id="custom-tags" placeholder="Enter hashtags separated by commas..." />
-          
-          <label for="custom-username">Username:</label>
-          <input type="text" id="custom-username" placeholder="Enter your username..." />
-          
-          <label for="custom-watched-date">Watched Date (optional):</label>
-          <input type="date" id="custom-watched-date" />
-          
-          <button type="submit">Generate Image</button>
         </div>
       </div>
 

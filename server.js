@@ -145,6 +145,51 @@ app.post('/search-media', async (req, res) => {
   }
 });
 
+// TV seasons endpoint
+app.get('/tv-seasons', async (req, res) => {
+  const { mediaId } = req.query;
+  if (!mediaId) {
+    return res.status(400).json({ error: 'mediaId is required' });
+  }
+
+  try {
+    const tvData = await fetch(`https://api.themoviedb.org/3/tv/${mediaId}?api_key=${TMDB_API_KEY}`).then(r => r.json());
+    const seasons = (tvData.seasons || [])
+      .filter(season => season.season_number > 0)
+      .map(season => ({
+        season_number: season.season_number,
+        name: season.name,
+        episode_count: season.episode_count
+      }));
+
+    res.json({ seasons });
+  } catch (error) {
+    console.error('❌ Error fetching TV seasons:', error.message);
+    res.status(500).json({ error: 'Failed to fetch TV seasons' });
+  }
+});
+
+// TV episodes endpoint
+app.get('/tv-episodes', async (req, res) => {
+  const { mediaId, seasonNumber } = req.query;
+  if (!mediaId || !seasonNumber) {
+    return res.status(400).json({ error: 'mediaId and seasonNumber are required' });
+  }
+
+  try {
+    const seasonData = await fetch(`https://api.themoviedb.org/3/tv/${mediaId}/season/${seasonNumber}?api_key=${TMDB_API_KEY}`).then(r => r.json());
+    const episodes = (seasonData.episodes || []).map(episode => ({
+      episode_number: episode.episode_number,
+      name: episode.name
+    }));
+
+    res.json({ episodes });
+  } catch (error) {
+    console.error('❌ Error fetching TV episodes:', error.message);
+    res.status(500).json({ error: 'Failed to fetch TV episodes' });
+  }
+});
+
 function escapeXml(unsafe) {
   return unsafe.replace(/[<>&'\"]+/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&apos;' }[c]));
 }
@@ -584,7 +629,9 @@ async function generateExperimentalPoster(movieData, settings, selectedPosterInd
   if (settings.gradientOverlay !== false) {
     const gradientSvg = `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
       <defs><linearGradient id="fade" x1="0" y1="1" x2="0" y2="0">
-      <stop offset="0%" stop-color="#000" stop-opacity="0.5"/>
+      <stop offset="0%" stop-color="#000" stop-opacity="0.8"/>
+      <stop offset="25%" stop-color="#000" stop-opacity="0.6"/>
+      <stop offset="50%" stop-color="#000" stop-opacity="0.3"/>
       <stop offset="100%" stop-color="#000" stop-opacity="0"/></linearGradient></defs>
       <rect width="${width}" height="${height}" fill="url(#fade)"/></svg>`;
     layers.push({ input: Buffer.from(gradientSvg), top: 0, left: 0 });
@@ -691,10 +738,16 @@ async function generatePosterImage(movieData, settings, selectedPosterIndex = 0,
     const avgRuntime = Math.round(details.episode_run_time.reduce((a, b) => a + b, 0) / details.episode_run_time.length);
     tvRuntime = `${avgRuntime}min`;
   }
-  // Compose season/episode/runtime info for TV
-  const seasonInfo = isTV && numSeasons && numEpisodes
-    ? `${tvRuntime ? tvRuntime + ' | ' : ''}${numSeasons} Season${numSeasons > 1 ? 's' : ''} | ${numEpisodes} Episode${numEpisodes > 1 ? 's' : ''}`
+  const selectedSeason = movieData.seasonNumber;
+  const selectedEpisode = movieData.episodeNumber;
+  const selectionInfo = isTV && selectedSeason
+    ? (selectedEpisode ? `Season ${selectedSeason} • Episode ${selectedEpisode}` : `Season ${selectedSeason}`)
     : '';
+
+  // Compose season/episode/runtime info for TV
+  const seasonInfo = selectionInfo || (isTV && numSeasons && numEpisodes
+    ? `${tvRuntime ? tvRuntime + ' | ' : ''}${numSeasons} Season${numSeasons > 1 ? 's' : ''} | ${numEpisodes} Episode${numEpisodes > 1 ? 's' : ''}`
+    : '');
 
   for (const key of contentOrder) {
     if (key === 'title' && settings.showTitle) addWrappedLine(title, 'title', 36);
@@ -783,7 +836,9 @@ async function generatePosterImage(movieData, settings, selectedPosterIndex = 0,
   if (gradientOverlay) {
     const gradientSvg = `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
       <defs><linearGradient id="fade" x1="0" y1="1" x2="0" y2="0">
-      <stop offset="0%" stop-color="#000" stop-opacity="0.5"/>
+      <stop offset="0%" stop-color="#000" stop-opacity="0.8"/>
+      <stop offset="25%" stop-color="#000" stop-opacity="0.6"/>
+      <stop offset="50%" stop-color="#000" stop-opacity="0.3"/>
       <stop offset="100%" stop-color="#000" stop-opacity="0"/></linearGradient></defs>
       <rect width="${width}" height="${height}" fill="url(#fade)"/></svg>`;
     layers.push({ input: Buffer.from(gradientSvg), top: 0, left: 0 });
@@ -898,7 +953,7 @@ app.post('/generate-image', async (req, res) => {
       
     } else {
       console.log('\n🎬 === CUSTOM MODE ===');
-      const { mediaId, mediaType, rating, tags, username, watchedDate } = req.body;
+      const { mediaId, mediaType, rating, tags, username, watchedDate, seasonNumber, episodeNumber } = req.body;
       
       console.log('📝 Custom Input Data:', {
         mediaId: mediaId,
@@ -906,7 +961,9 @@ app.post('/generate-image', async (req, res) => {
         rating: rating ? `${rating}/5` : 'No rating',
         username: username || 'Anonymous',
         tags: tags?.length > 0 ? tags.join(', ') : 'None',
-        watchedDate: watchedDate || 'Not specified'
+        watchedDate: watchedDate || 'Not specified',
+        seasonNumber: seasonNumber || 'All seasons',
+        episodeNumber: episodeNumber || 'All episodes'
       });
       
       let mediaData;
@@ -933,6 +990,8 @@ app.post('/generate-image', async (req, res) => {
           rating,
           isLiked: false,
           watchedDate: watchedDate || null,
+          seasonNumber: seasonNumber ? parseInt(seasonNumber, 10) : null,
+          episodeNumber: episodeNumber ? parseInt(episodeNumber, 10) : null,
           movie: tvData,
           details: tvData,
           credits: tvCredits,
