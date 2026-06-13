@@ -145,6 +145,131 @@ app.post('/search-media', async (req, res) => {
   }
 });
 
+function cleanLetterboxdTitle(title) {
+  if (!title) return title;
+  let t = title.replace(/^[^:]*?review\s+of\s+/i, '').trim();
+  t = t.replace(/^[★☆½\s]+/g, '').trim();
+  t = t.replace(/\s*[-–]\s*(review|rewatched|watched).*$/i, '').trim();
+  return t;
+}
+
+function parseLetterboxdRating($) {
+  const ratingEl = $('.content-reactions-strip .inline-rating svg').first();
+  const ratingText = ratingEl.attr('aria-label') || ratingEl.find('title').first().text().trim();
+  if (ratingText) {
+    const fullStars = (ratingText.match(/★/g) || []).length;
+    const halfStar = /½/.test(ratingText) ? 0.5 : 0;
+    return fullStars + halfStar;
+  }
+
+  const oldRating = $('.rating-large').attr('class')?.match(/rated-large-(\d+)/)?.[1];
+  return oldRating ? Number(oldRating) / 2 : 0;
+}
+
+function parseLetterboxdLiked($) {
+  if ($('.content-reactions-strip .inline-liked, .content-reactions-strip .glyph.inline-liked').length > 0) return true;
+  if ($('.content-reactions-strip svg[aria-label="Liked"]').length > 0) return true;
+  return $('.icon-liked').length > 0;
+}
+
+function extractLetterboxdTitleAndYear($, letterboxdUrl = '') {
+  let title = $('meta[property="og:title"]').attr('content') || $('meta[name="twitter:title"]').attr('content') || '';
+  let year = '';
+
+  if (!title) {
+    const ldJson = $('script[type="application/ld+json"]').map((i, el) => $(el).html()).get().join('\n');
+    try {
+      const jsons = ldJson.split('\n').map(s => s.trim()).filter(Boolean);
+      for (const s of jsons) {
+        try {
+          const obj = JSON.parse(s);
+          if (obj && obj.name) {
+            title = obj.name;
+            if (obj.datePublished) year = String(obj.datePublished).substring(0, 4);
+            break;
+          }
+          if (Array.isArray(obj)) {
+            const found = obj.find(o => o && o['@type'] && (o['@type'] === 'Movie' || o['@type'] === 'CreativeWork'));
+            if (found && found.name) {
+              title = found.name;
+              if (found.datePublished) year = String(found.datePublished).substring(0, 4);
+              break;
+            }
+          }
+        } catch (e) {
+          continue;
+        }
+      }
+    } catch (e) {
+      // ignore JSON-LD parsing errors
+    }
+  }
+
+  if (!title) {
+    title = $('.topline .primaryname a').first().text().trim()
+      || $('.inline-production-masthead .name a').first().text().trim()
+      || $('.film-title-wrapper a').first().text().trim()
+      || $('h1').first().text().trim();
+  }
+
+  if (!year) {
+    year = $('.topline .releasedate a').first().text().trim()
+      || $('.inline-production-masthead .releasedate a').first().text().trim()
+      || $('.film-title-wrapper .metadata a').first().text().trim()
+      || '';
+  }
+
+  if (!title && letterboxdUrl) {
+    try {
+      const urlObj = new URL(letterboxdUrl);
+      const parts = urlObj.pathname.split('/').filter(Boolean);
+      const filmIndex = parts.findIndex(p => p.toLowerCase() === 'film');
+      const slug = filmIndex !== -1 ? parts[filmIndex + 1] : parts[parts.length - 1];
+      if (slug) {
+        title = decodeURIComponent(slug).replace(/[-_]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+      }
+    } catch (e) {
+      // ignore URL parse errors
+    }
+  }
+
+  title = cleanLetterboxdTitle(title);
+
+  if (title) {
+    title = title.replace(/\u00A0/g, ' ').trim();
+    const m = title.match(/^(.*)\s*\((\d{4})\)\s*$/);
+    if (m) {
+      title = m[1].trim();
+      year = year || m[2];
+    }
+  }
+
+  return { title, year };
+}
+
+function extractLetterboxdReviewData($, letterboxdUrl = '') {
+  const { title, year } = extractLetterboxdTitleAndYear($, letterboxdUrl);
+  const directorText = $('a[href*="/director/"]').first().text().trim();
+  const username = $('.person-summary .name span').first().text().trim();
+  const tags = $('ul.tags li a').map((_, el) => $(el).text().trim()).get();
+  const rating = parseLetterboxdRating($);
+  const isLiked = parseLetterboxdLiked($);
+
+  let watchedDate = null;
+  const viewDateElement = $('.view-date.date-links');
+  if (viewDateElement.length) {
+    const dateLinks = viewDateElement.find('a');
+    if (dateLinks.length >= 3) {
+      const day = $(dateLinks[0]).text().trim();
+      const month = $(dateLinks[1]).text().trim();
+      const yearText = $(dateLinks[2]).text().trim();
+      watchedDate = `${day} ${month} ${yearText}`;
+    }
+  }
+
+  return { title, year, directorText, username, tags, rating, isLiked, watchedDate };
+}
+
 // Letterboxd preview endpoint
 app.post('/letterboxd-preview', async (req, res) => {
   const { letterboxdUrl } = req.body;
@@ -157,16 +282,15 @@ app.post('/letterboxd-preview', async (req, res) => {
     const response = await fetch(letterboxdUrl);
     const html = await response.text();
     const $ = cheerio.load(html);
+    const { title, year } = extractLetterboxdTitleAndYear($, letterboxdUrl);
+    const directorText = $('a[href*="/director/"]').first().text().trim();
 
-    let title = $('.inline-production-masthead .name a').first().text().trim();
-    let year = $('.inline-production-masthead .releasedate a').first().text().trim();
+    console.log('📝 Parsed Letterboxd:', { title, year, directorText });
 
     if (!title) {
-      title = $('.film-title-wrapper a').first().text().trim();
-      year = $('.film-title-wrapper .metadata a').first().text().trim();
+      console.error('❌ Could not extract title from Letterboxd URL');
+      return res.status(400).json({ error: 'Could not determine title from Letterboxd page' });
     }
-
-    const directorText = $('a[href*="/director/"]').first().text().trim();
 
     const { movie, details, credits } = await fetchTmdbData(title, year, directorText);
     const director = credits.crew?.find(c => c.job === 'Director')?.name || '';
@@ -926,36 +1050,7 @@ app.post('/generate-image', async (req, res) => {
       const html = await response.text();
       const $ = cheerio.load(html);
 
-      // Try new structure first (2025 format)
-      let title = $('.inline-production-masthead .name a').first().text().trim();
-      let year = $('.inline-production-masthead .releasedate a').first().text().trim();
-      
-      // Fallback to old structure if new structure not found
-      if (!title) {
-        title = $('.film-title-wrapper a').first().text().trim();
-        year = $('.film-title-wrapper .metadata a').first().text().trim();
-      }
-      
-      const directorText = $('a[href*="/director/"]').first().text().trim();
-      const username = $('.person-summary .name span').first().text().trim();
-      const tags = $('ul.tags li a').map((_, el) => $(el).text().trim()).get();
-      const rating = ($('.rating-large').attr('class')?.match(/rated-large-(\d+)/)?.[1] || 0) / 2;
-      
-      // Check if the review is liked (heart present)
-      const isLiked = $('.icon-liked').length > 0;
-
-      // Extract watched date
-      let watchedDate = null;
-      const viewDateElement = $('.view-date.date-links');
-      if (viewDateElement.length) {
-        const dateLinks = viewDateElement.find('a');
-        if (dateLinks.length >= 3) {
-          const day = $(dateLinks[0]).text().trim();
-          const month = $(dateLinks[1]).text().trim();
-          const year = $(dateLinks[2]).text().trim();
-          watchedDate = `${day} ${month} ${year}`;
-        }
-      }
+      const { title, year, directorText, username, tags, rating, isLiked, watchedDate } = extractLetterboxdReviewData($, letterboxdUrl);
 
       console.log('📋 Extracted Letterboxd Data:');
       console.log('  🎬 Title:', title || 'Not found');
