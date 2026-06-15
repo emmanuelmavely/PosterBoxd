@@ -247,10 +247,30 @@ function extractLetterboxdTitleAndYear($, letterboxdUrl = '') {
   return { title, year };
 }
 
+function extractLetterboxdUsername($, letterboxdUrl = '') {
+  let username = $('.person-summary .name span').first().text().trim()
+    || $('.person-summary a.name span').first().text().trim()
+    || $('.person-summary .avatar img').attr('alt')
+    || '';
+
+  if (!username && letterboxdUrl) {
+    try {
+      const parts = new URL(letterboxdUrl).pathname.split('/').filter(Boolean);
+      if (parts.length >= 2 && parts[1] === 'film' && parts[0] !== 'film') {
+        username = parts[0];
+      }
+    } catch (e) {
+      // ignore URL parse errors
+    }
+  }
+
+  return username;
+}
+
 function extractLetterboxdReviewData($, letterboxdUrl = '') {
   const { title, year } = extractLetterboxdTitleAndYear($, letterboxdUrl);
   const directorText = $('a[href*="/director/"]').first().text().trim();
-  const username = $('.person-summary .name span').first().text().trim();
+  const username = extractLetterboxdUsername($, letterboxdUrl);
   const tags = $('ul.tags li a').map((_, el) => $(el).text().trim()).get();
   const rating = parseLetterboxdRating($);
   const isLiked = parseLetterboxdLiked($);
@@ -282,10 +302,9 @@ app.post('/letterboxd-preview', async (req, res) => {
     const response = await fetch(letterboxdUrl);
     const html = await response.text();
     const $ = cheerio.load(html);
-    const { title, year } = extractLetterboxdTitleAndYear($, letterboxdUrl);
-    const directorText = $('a[href*="/director/"]').first().text().trim();
+    const { title, year, directorText, username, tags, rating, isLiked, watchedDate } = extractLetterboxdReviewData($, letterboxdUrl);
 
-    console.log('📝 Parsed Letterboxd:', { title, year, directorText });
+    console.log('📝 Parsed Letterboxd:', { title, year, directorText, username, rating, isLiked, watchedDate });
 
     if (!title) {
       console.error('❌ Could not extract title from Letterboxd URL');
@@ -301,11 +320,14 @@ app.post('/letterboxd-preview', async (req, res) => {
       name: movie?.title || title,
       release_date: movie?.release_date || (year ? `${year}-01-01` : ''),
       overview: movie?.overview || '',
-      vote_average: movie?.vote_average || 0,
-      vote_count: movie?.vote_count || 0,
       director,
       poster_path: movie?.poster_path || null,
-      poster_url: movie?.poster_path ? `https://image.tmdb.org/t/p/w92${movie.poster_path}` : ''
+      poster_url: movie?.poster_path ? `https://image.tmdb.org/t/p/w92${movie.poster_path}` : '',
+      rating,
+      username,
+      isLiked,
+      tags,
+      watchedDate
     });
   } catch (error) {
     console.error('❌ Letterboxd preview error:', error.message);

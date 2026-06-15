@@ -224,6 +224,14 @@ document.addEventListener('DOMContentLoaded', () => {
       handleSearch();
     });
 
+    function formatLetterboxdStars(rating) {
+      if (!rating) return null;
+      const full = Math.floor(rating);
+      const half = rating % 1 >= 0.5;
+      const empty = 5 - full - (half ? 1 : 0);
+      return '★'.repeat(full) + (half ? '½' : '') + '☆'.repeat(empty);
+    }
+
     function displaySearchResults(results) {
       if (!results || results.length === 0) {
         searchResults.innerHTML = '<div style="padding: 1rem; text-align: center;">No results found</div>';
@@ -235,16 +243,31 @@ document.addEventListener('DOMContentLoaded', () => {
         const isLetterboxd = item.media_type === 'letterboxd';
         const mediaType = isLetterboxd ? 'Letterboxd' : (item.media_type === 'tv' ? 'TV Series' : 'Movie');
         const mediaTypeClass = isLetterboxd ? 'letterboxd' : (item.media_type === 'tv' ? 'tv-series' : '');
-        const rating = item.vote_average ? item.vote_average.toFixed(1) : (isLetterboxd ? '—' : 'N/A');
+        const letterboxdStars = isLetterboxd ? formatLetterboxdStars(item.rating) : null;
+        const rating = isLetterboxd
+          ? (letterboxdStars || 'No rating')
+          : (item.vote_average ? item.vote_average.toFixed(1) : 'N/A');
         const voteCount = item.vote_count || 0;
-        const overview = item.overview ? item.overview.substring(0, 120) + '...' : 'No description available';          // Director/Creator and Cast info
+        const overview = item.overview ? item.overview.substring(0, 120) + '...' : 'No description available';
         const directorLabel = item.media_type === 'tv' ? 'Created by' : 'Directed by';
         const directorInfo = item.director ? `<div class="search-result-meta"><strong>${directorLabel}:</strong> ${item.director}</div>` : '';
         const castInfo = item.cast && item.cast.length > 0 ? `<div class="search-result-meta"><strong>Cast:</strong> ${item.cast.join(', ')}</div>` : '';
+        const letterboxdUserInfo = isLetterboxd && item.username
+          ? `<div class="search-result-meta"><strong>Review by:</strong> ${item.username}</div>`
+          : '';
         
         // Create info tags for both TV series and movies
         let infoTags = '';
-        if (item.media_type === 'tv') {
+        if (isLetterboxd) {
+          const tags = [];
+          if (item.isLiked) tags.push('❤️ Liked');
+          if (item.watchedDate) tags.push(`Watched ${item.watchedDate}`);
+          if (item.tags?.length) tags.push(...item.tags.map(t => `#${t}`));
+
+          if (tags.length > 0) {
+            infoTags = `<div class="search-result-tags">${tags.map(tag => `<span class="info-tag letterboxd-tag">${tag}</span>`).join('')}</div>`;
+          }
+        } else if (item.media_type === 'tv') {
           // TV series tags
           const tags = [];
           if (item.number_of_seasons) tags.push(`${item.number_of_seasons} SEASON${item.number_of_seasons > 1 ? 'S' : ''}`);
@@ -290,10 +313,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 <span class="search-result-type ${mediaTypeClass}">${mediaType}</span>
               </div>
               <div class="search-result-rating">
-                <span class="search-result-score">${rating}${isLetterboxd ? '' : '/10'}</span>
-                ${isLetterboxd ? '<span class="search-result-votes">From Letterboxd link</span>' : `<span class="search-result-votes">(${voteCount.toLocaleString()} votes)</span>`}
+                <span class="search-result-score ${isLetterboxd ? 'letterboxd-stars' : ''}">${rating}${isLetterboxd ? '' : '/10'}</span>
+                ${isLetterboxd
+                  ? (item.rating ? `<span class="search-result-votes">${item.rating}/5</span>` : '')
+                  : `<span class="search-result-votes">(${voteCount.toLocaleString()} votes)</span>`
+                }
               </div>
               ${infoTags}
+              ${letterboxdUserInfo}
               ${directorInfo}
               ${castInfo}
               <div class="search-result-overview">${overview}</div>
@@ -357,10 +384,20 @@ document.addEventListener('DOMContentLoaded', () => {
       // Set title and year
       const title = item.title || item.name;
       const year = (item.release_date || item.first_air_date) ? `(${(item.release_date || item.first_air_date).substring(0, 4)})` : '';
-      const mediaType = item.media_type === 'letterboxd' ? 'Letterboxd' : (item.media_type === 'tv' ? 'TV Series' : 'Movie');
-      
+
       selectedTitle.textContent = `${title} ${year}`;
-      selectedMeta.textContent = mediaType;
+
+      if (item.media_type === 'letterboxd') {
+        const metaParts = [];
+        if (item.username) metaParts.push(`Review by ${item.username}`);
+        const stars = formatLetterboxdStars(item.rating);
+        if (stars) metaParts.push(stars);
+        if (item.isLiked) metaParts.push('❤️');
+        selectedMeta.textContent = metaParts.length ? metaParts.join(' · ') : 'Letterboxd';
+      } else {
+        const mediaType = item.media_type === 'tv' ? 'TV Series' : 'Movie';
+        selectedMeta.textContent = mediaType;
+      }
 
       if (item.media_type === 'tv') {
         loadTvSeasons(item.id);
